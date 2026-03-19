@@ -107,6 +107,7 @@ class TrendSubsWindow(QWidget):
         self.margin_input = QLineEdit("120")
         self.safe_area_input = QLineEdit("0")
         self.max_words_input = QLineEdit("0")
+        self.max_caption_words_input = QLineEdit("0")
         self.preview_time_input = QLineEdit("10")
         self.auto_scale_check = QCheckBox("Auto scale font")
         self.auto_scale_check.setChecked(True)
@@ -137,6 +138,7 @@ class TrendSubsWindow(QWidget):
         form.addRow("Bottom Margin", self.margin_input)
         form.addRow("Safe Area Offset", self.safe_area_input)
         form.addRow("Max Words/Line (0=auto)", self.max_words_input)
+        form.addRow("Max Words/Caption (0=off)", self.max_caption_words_input)
         form.addRow("Preview Time (sec)", self.preview_time_input)
         form.addRow("Auto Scale", self.auto_scale_check)
 
@@ -291,8 +293,9 @@ class TrendSubsWindow(QWidget):
             bottom_margin = int(self.margin_input.text().strip() or "120")
             safe_area_offset = int(self.safe_area_input.text().strip() or "0")
             max_words = int(self.max_words_input.text().strip() or "0")
+            max_caption_words = int(self.max_caption_words_input.text().strip() or "0")
         except ValueError:
-            self.log_output.append("Size, Bottom Margin, Safe Area, Max Words must be numbers.")
+            self.log_output.append("Size, Bottom Margin, Safe Area, Max Words/Line, Max Words/Caption must be numbers.")
             return None
 
         return RenderOptions(
@@ -304,6 +307,7 @@ class TrendSubsWindow(QWidget):
             keep_ass=False,
             mode=self.mode_combo.currentText(),
             max_words_per_line=max(0, max_words),
+            max_words_per_caption=max(0, max_caption_words),
             safe_area_offset=max(0, safe_area_offset),
             auto_font_scale=self.auto_scale_check.isChecked(),
         )

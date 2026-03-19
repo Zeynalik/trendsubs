@@ -39,6 +39,8 @@ def test_cli_render_invokes_shared_service(tmp_path, monkeypatch):
             "reveal",
             "--max-words-per-line",
             "3",
+            "--max-words-per-caption",
+            "8",
             "--safe-area-offset",
             "24",
             "--no-auto-font-scale",
@@ -51,6 +53,7 @@ def test_cli_render_invokes_shared_service(tmp_path, monkeypatch):
     assert called["output_path"] == output_path
     assert called["options"].mode == "reveal"
     assert called["options"].max_words_per_line == 3
+    assert called["options"].max_words_per_caption == 8
     assert called["options"].safe_area_offset == 24
     assert called["options"].auto_font_scale is False
 

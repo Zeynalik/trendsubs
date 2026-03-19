@@ -6,7 +6,7 @@ import subprocess
 
 from trendsubs.core.ass_builder import build_ass_document
 from trendsubs.core.ffmpeg_runner import build_ffmpeg_command, build_preview_command
-from trendsubs.core.models import RenderOptions
+from trendsubs.core.models import RenderOptions, SubtitleCue
 from trendsubs.core.srt_parser import parse_srt_text
 from trendsubs.core.word_timing import split_cue_into_word_slices
 
@@ -30,6 +30,7 @@ def render_subtitled_video(
             start_ms=cue.start_ms,
             end_ms=cue.end_ms,
         )
+    cues = _apply_caption_word_limit(cues, max_words_per_caption=options.max_words_per_caption)
 
     play_res = _probe_video_resolution(video_path)
     ass_text = build_ass_document(cues, options, play_res=play_res)
@@ -71,6 +72,7 @@ def render_preview_frame(
             start_ms=cue.start_ms,
             end_ms=cue.end_ms,
         )
+    cues = _apply_caption_word_limit(cues, max_words_per_caption=options.max_words_per_caption)
     preview_seconds = _resolve_preview_seconds(cues, requested_seconds=at_seconds)
 
     play_res = _probe_video_resolution(video_path)
@@ -107,6 +109,49 @@ def _resolve_preview_seconds(cues: list, requested_seconds: float) -> float:
     )
     midpoint_ms = (nearest_cue.start_ms + nearest_cue.end_ms) // 2
     return midpoint_ms / 1000.0
+
+
+def _apply_caption_word_limit(cues: list[SubtitleCue], max_words_per_caption: int) -> list[SubtitleCue]:
+    if max_words_per_caption <= 0:
+        return cues
+
+    limited: list[SubtitleCue] = []
+    index = 1
+    for cue in cues:
+        words = cue.word_slices
+        if len(words) <= max_words_per_caption:
+            limited.append(
+                SubtitleCue(
+                    index=index,
+                    start_ms=cue.start_ms,
+                    end_ms=cue.end_ms,
+                    text=cue.text,
+                    lines=cue.lines,
+                    word_slices=words,
+                )
+            )
+            index += 1
+            continue
+
+        for chunk_start in range(0, len(words), max_words_per_caption):
+            chunk = words[chunk_start : chunk_start + max_words_per_caption]
+            if not chunk:
+                continue
+
+            chunk_text = " ".join(word.text for word in chunk).strip()
+            limited.append(
+                SubtitleCue(
+                    index=index,
+                    start_ms=chunk[0].start_ms,
+                    end_ms=chunk[-1].end_ms,
+                    text=chunk_text,
+                    lines=[chunk_text],
+                    word_slices=chunk,
+                )
+            )
+            index += 1
+
+    return limited
 
 
 def _probe_video_resolution(video_path: Path) -> tuple[int, int]:

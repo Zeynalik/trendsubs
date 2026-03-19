@@ -31,6 +31,7 @@ def test_trendsubs_window_builds_expected_form_fields():
     assert window.render_button.text() == "Render"
     assert window.preview_button.text() == "Preview Frame"
     assert window.size_input.text() == "40"
+    assert window.max_caption_words_input.text() == "0"
     app.quit()
 
 
@@ -67,6 +68,7 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     window.font_combo.setCurrentIndex(font_index)
     window.mode_combo.setCurrentText("reveal")
     window.max_words_input.setText("3")
+    window.max_caption_words_input.setText("8")
     window.safe_area_input.setText("15")
     window.auto_scale_check.setChecked(False)
     window.run_render()
@@ -76,6 +78,7 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     assert called["output_path"] == output_path
     assert called["options"].mode == "reveal"
     assert called["options"].max_words_per_line == 3
+    assert called["options"].max_words_per_caption == 8
     assert called["options"].safe_area_offset == 15
     assert called["options"].auto_font_scale is False
     assert "Rendered video" in window.log_output.toPlainText()

@@ -19,6 +19,7 @@ python -m venv .venv
   --font C:\Windows\Fonts\arial.ttf `
   --mode reveal `
   --max-words-per-line 3 `
+  --max-words-per-caption 8 `
   --safe-area-offset 30 `
   --no-auto-font-scale
 ```
@@ -42,3 +43,4 @@ Or double-click `start_trendsubs_gui.bat` in the project root.
 - `Mode`:
   - `highlight` -> words change from base white to selected color while spoken.
   - `reveal` -> words appear progressively in selected color.
+- `Max Words/Caption`: split long subtitle chunks into smaller timed captions (e.g., `8` words per caption).
