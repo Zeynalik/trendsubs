@@ -35,6 +35,13 @@ def test_cli_render_invokes_shared_service(tmp_path, monkeypatch):
             str(output_path),
             "--font",
             str(font_path),
+            "--mode",
+            "reveal",
+            "--max-words-per-line",
+            "3",
+            "--safe-area-offset",
+            "24",
+            "--no-auto-font-scale",
         ],
     )
 
@@ -42,6 +49,10 @@ def test_cli_render_invokes_shared_service(tmp_path, monkeypatch):
     assert called["video_path"] == video_path
     assert called["srt_path"] == srt_path
     assert called["output_path"] == output_path
+    assert called["options"].mode == "reveal"
+    assert called["options"].max_words_per_line == 3
+    assert called["options"].safe_area_offset == 24
+    assert called["options"].auto_font_scale is False
 
 
 def test_cli_gui_launches_desktop_app(monkeypatch):

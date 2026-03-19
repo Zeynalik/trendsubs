@@ -2,11 +2,15 @@ import os
 
 from PySide6.QtWidgets import QApplication
 
-from trendsubs.gui.window import TrendSubsWindow, build_preset_names
+from trendsubs.gui.window import TrendSubsWindow, build_color_names, build_preset_names
 
 
 def test_build_preset_names_exposes_all_default_presets():
     assert build_preset_names() == ["social-pop", "clean-pro", "impact-caps"]
+
+
+def test_build_color_names_exposes_available_colors():
+    assert build_color_names() == ["Yellow", "White", "Red"]
 
 
 def test_trendsubs_window_builds_expected_form_fields():
@@ -17,9 +21,15 @@ def test_trendsubs_window_builds_expected_form_fields():
 
     assert window.video_input.placeholderText() == "Select input video"
     assert window.srt_input.placeholderText() == "Select subtitle file"
-    assert window.font_input.placeholderText() == "Select .ttf or .otf font"
+    assert window.output_dir_input.placeholderText() == "Choose output folder"
+    assert window.output_name_input.placeholderText() == "Output file name (without .mp4)"
     assert window.preset_combo.count() == 3
+    assert window.color_combo.count() == 3
+    assert window.mode_combo.count() == 2
+    assert window.font_combo.count() >= 1
+    assert window.auto_scale_check.isChecked() is True
     assert window.render_button.text() == "Render"
+    assert window.preview_button.text() == "Preview Frame"
     assert window.size_input.text() == "40"
     app.quit()
 
@@ -45,15 +55,29 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     monkeypatch.setattr("trendsubs.gui.window.render_subtitled_video", fake_render)
 
     window = TrendSubsWindow()
+    font_index = window.font_combo.findData(str(font_path.resolve()))
+    if font_index < 0:
+        window.font_combo.addItem(font_path.stem, str(font_path.resolve()))
+        font_index = window.font_combo.count() - 1
+
     window.video_input.setText(str(video_path))
     window.srt_input.setText(str(srt_path))
     window.output_input.setText(str(output_path))
-    window.font_input.setText(str(font_path))
+    window.output_dir_input.setText(str(tmp_path))
+    window.font_combo.setCurrentIndex(font_index)
+    window.mode_combo.setCurrentText("reveal")
+    window.max_words_input.setText("3")
+    window.safe_area_input.setText("15")
+    window.auto_scale_check.setChecked(False)
     window.run_render()
 
     assert called["video_path"] == video_path
     assert called["srt_path"] == srt_path
     assert called["output_path"] == output_path
+    assert called["options"].mode == "reveal"
+    assert called["options"].max_words_per_line == 3
+    assert called["options"].safe_area_offset == 15
+    assert called["options"].auto_font_scale is False
     assert "Rendered video" in window.log_output.toPlainText()
     app.quit()
 
@@ -79,10 +103,15 @@ def test_trendsubs_window_run_render_accepts_wrapped_quotes(tmp_path, monkeypatc
     monkeypatch.setattr("trendsubs.gui.window.render_subtitled_video", fake_render)
 
     window = TrendSubsWindow()
+    font_index = window.font_combo.findData(str(font_path.resolve()))
+    if font_index < 0:
+        window.font_combo.addItem(font_path.stem, str(font_path.resolve()))
+        font_index = window.font_combo.count() - 1
+
     window.video_input.setText(f'"{video_path}"')
     window.srt_input.setText(f'"{srt_path}"')
     window.output_input.setText(f'"{output_path}"')
-    window.font_input.setText(f'"{font_path}"')
+    window.font_combo.setCurrentIndex(font_index)
     window.run_render()
 
     assert called["video_path"] == video_path
@@ -96,9 +125,10 @@ def test_trendsubs_window_run_render_logs_missing_files():
     app = QApplication.instance() or QApplication([])
 
     window = TrendSubsWindow()
+    window.font_combo.addItem("missing", r"C:\missing\font.ttf")
+    window.font_combo.setCurrentIndex(window.font_combo.count() - 1)
     window.video_input.setText(r"C:\missing\video.mp4")
     window.srt_input.setText(r"C:\missing\subs.srt")
-    window.font_input.setText(r"C:\missing\font.ttf")
     window.output_input.setText(r"C:\missing\out.mp4")
     window.run_render()
 
@@ -141,4 +171,123 @@ def test_trendsubs_window_pick_output_updates_output_field(tmp_path, monkeypatch
     window.pick_output()
 
     assert window.output_input.text() == str(selected)
+    app.quit()
+
+
+def test_trendsubs_window_run_preview_uses_preview_service(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+
+    video_path = tmp_path / "video.mp4"
+    srt_path = tmp_path / "subs.srt"
+    font_path = tmp_path / "font.ttf"
+    output_path = tmp_path / "out.mp4"
+    preview_path = output_path.with_suffix(".preview.png")
+    video_path.write_bytes(b"video")
+    srt_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n", encoding="utf-8")
+    font_path.write_bytes(b"font")
+
+    called = {}
+
+    def fake_preview(**kwargs):
+        called.update(kwargs)
+        preview_path.write_bytes(b"png")
+        return preview_path
+
+    monkeypatch.setattr("trendsubs.gui.window.render_preview_frame", fake_preview)
+
+    window = TrendSubsWindow()
+    font_index = window.font_combo.findData(str(font_path.resolve()))
+    if font_index < 0:
+        window.font_combo.addItem(font_path.stem, str(font_path.resolve()))
+        font_index = window.font_combo.count() - 1
+
+    window.video_input.setText(str(video_path))
+    window.srt_input.setText(str(srt_path))
+    window.output_input.setText(str(output_path))
+    window.output_dir_input.setText(str(tmp_path))
+    window.font_combo.setCurrentIndex(font_index)
+    window.preview_time_input.setText("2.0")
+    window.run_preview()
+
+    assert called["video_path"] == video_path
+    assert called["srt_path"] == srt_path
+    assert called["output_image_path"] == preview_path
+    assert called["at_seconds"] == 2.0
+    assert "Preview saved" in window.log_output.toPlainText()
+    app.quit()
+
+
+def test_trendsubs_window_defaults_output_to_selected_folder(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+
+    video_path = tmp_path / "clip.mp4"
+    srt_path = tmp_path / "subs.srt"
+    font_path = tmp_path / "font.ttf"
+    output_dir = tmp_path / "renders"
+    video_path.write_bytes(b"video")
+    srt_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n", encoding="utf-8")
+    font_path.write_bytes(b"font")
+
+    called = {}
+
+    def fake_render(**kwargs):
+        called.update(kwargs)
+        return None
+
+    monkeypatch.setattr("trendsubs.gui.window.render_subtitled_video", fake_render)
+
+    window = TrendSubsWindow()
+    font_index = window.font_combo.findData(str(font_path.resolve()))
+    if font_index < 0:
+        window.font_combo.addItem(font_path.stem, str(font_path.resolve()))
+        font_index = window.font_combo.count() - 1
+
+    window.video_input.setText(str(video_path))
+    window.srt_input.setText(str(srt_path))
+    window.output_input.setText("")
+    window.output_dir_input.setText(str(output_dir))
+    window.font_combo.setCurrentIndex(font_index)
+    window.run_render()
+
+    assert called["output_path"] == output_dir / "clip_subbed.mp4"
+    app.quit()
+
+
+def test_trendsubs_window_uses_custom_output_name(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+
+    video_path = tmp_path / "clip.mp4"
+    srt_path = tmp_path / "subs.srt"
+    font_path = tmp_path / "font.ttf"
+    output_dir = tmp_path / "renders"
+    video_path.write_bytes(b"video")
+    srt_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n", encoding="utf-8")
+    font_path.write_bytes(b"font")
+
+    called = {}
+
+    def fake_render(**kwargs):
+        called.update(kwargs)
+        return None
+
+    monkeypatch.setattr("trendsubs.gui.window.render_subtitled_video", fake_render)
+
+    window = TrendSubsWindow()
+    font_index = window.font_combo.findData(str(font_path.resolve()))
+    if font_index < 0:
+        window.font_combo.addItem(font_path.stem, str(font_path.resolve()))
+        font_index = window.font_combo.count() - 1
+
+    window.video_input.setText(str(video_path))
+    window.srt_input.setText(str(srt_path))
+    window.output_input.setText("")
+    window.output_dir_input.setText(str(output_dir))
+    window.output_name_input.setText("my_final_short")
+    window.font_combo.setCurrentIndex(font_index)
+    window.run_render()
+
+    assert called["output_path"] == output_dir / "my_final_short.mp4"
     app.quit()

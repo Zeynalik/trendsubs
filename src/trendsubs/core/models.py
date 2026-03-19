@@ -29,3 +29,7 @@ class RenderOptions:
     font_size: int
     bottom_margin: int
     keep_ass: bool
+    mode: str = "highlight"
+    max_words_per_line: int = 0
+    safe_area_offset: int = 0
+    auto_font_scale: bool = True

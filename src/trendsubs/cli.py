@@ -27,6 +27,10 @@ def render_command(
     accent: str = typer.Option("#FFD84D"),
     size: int = typer.Option(40),
     bottom_margin: int = typer.Option(120),
+    mode: str = typer.Option("highlight"),
+    max_words_per_line: int = typer.Option(0),
+    safe_area_offset: int = typer.Option(0),
+    auto_font_scale: bool = typer.Option(True),
     keep_ass: bool = typer.Option(False),
 ) -> None:
     render_subtitled_video(
@@ -40,6 +44,10 @@ def render_command(
             font_size=size,
             bottom_margin=bottom_margin,
             keep_ass=keep_ass,
+            mode=mode,
+            max_words_per_line=max(0, max_words_per_line),
+            safe_area_offset=max(0, safe_area_offset),
+            auto_font_scale=auto_font_scale,
         ),
     )
     typer.echo(f"Rendered video: {out}")

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from trendsubs.core.models import RenderOptions
-from trendsubs.core.render_service import render_subtitled_video
+from trendsubs.core.render_service import render_preview_frame, render_subtitled_video
 
 
 def test_render_subtitled_video_generates_ass_and_invokes_ffmpeg(tmp_path: Path):
@@ -79,3 +79,80 @@ def test_render_subtitled_video_removes_intermediate_ass_when_disabled(tmp_path:
 
     assert result.ass_path is None
     assert not output_path.with_suffix(".ass").exists()
+
+
+def test_render_preview_frame_runs_ffmpeg_preview_and_cleans_ass(tmp_path: Path):
+    srt_path = tmp_path / "input.srt"
+    video_path = tmp_path / "input.mp4"
+    font_path = tmp_path / "font.ttf"
+    preview_path = tmp_path / "preview.png"
+    srt_path.write_text(
+        "1\n00:00:01,000 --> 00:00:02,500\nHello brave world\n",
+        encoding="utf-8",
+    )
+    video_path.write_bytes(b"video")
+    font_path.write_bytes(b"font")
+    captured: list[list[str]] = []
+
+    def fake_runner(command: list[str]) -> None:
+        captured.append(command)
+        preview_path.write_bytes(b"png")
+
+    out = render_preview_frame(
+        video_path=video_path,
+        srt_path=srt_path,
+        output_image_path=preview_path,
+        at_seconds=1.2,
+        options=RenderOptions(
+            preset="social-pop",
+            font_path=str(font_path),
+            accent_color="#FFD84D",
+            font_size=40,
+            bottom_margin=120,
+            keep_ass=False,
+        ),
+        command_runner=fake_runner,
+    )
+
+    assert out == preview_path
+    assert preview_path.exists()
+    assert captured and "-frames:v" in captured[0]
+    assert captured[0][captured[0].index("-ss") + 1] == "1.200"
+    assert not preview_path.with_suffix(".preview.ass").exists()
+
+
+def test_render_preview_frame_shifts_to_nearest_subtitle_when_requested_second_has_no_text(tmp_path: Path):
+    srt_path = tmp_path / "input.srt"
+    video_path = tmp_path / "input.mp4"
+    font_path = tmp_path / "font.ttf"
+    preview_path = tmp_path / "preview.png"
+    srt_path.write_text(
+        "1\n00:00:10,000 --> 00:00:12,000\nHello brave world\n",
+        encoding="utf-8",
+    )
+    video_path.write_bytes(b"video")
+    font_path.write_bytes(b"font")
+    captured: list[list[str]] = []
+
+    def fake_runner(command: list[str]) -> None:
+        captured.append(command)
+        preview_path.write_bytes(b"png")
+
+    render_preview_frame(
+        video_path=video_path,
+        srt_path=srt_path,
+        output_image_path=preview_path,
+        at_seconds=1.0,
+        options=RenderOptions(
+            preset="social-pop",
+            font_path=str(font_path),
+            accent_color="#FFD84D",
+            font_size=40,
+            bottom_margin=120,
+            keep_ass=False,
+        ),
+        command_runner=fake_runner,
+    )
+
+    assert captured
+    assert captured[0][captured[0].index("-ss") + 1] == "11.000"

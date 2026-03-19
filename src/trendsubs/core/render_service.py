@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 
 from trendsubs.core.ass_builder import build_ass_document
-from trendsubs.core.ffmpeg_runner import build_ffmpeg_command
+from trendsubs.core.ffmpeg_runner import build_ffmpeg_command, build_preview_command
 from trendsubs.core.models import RenderOptions
 from trendsubs.core.srt_parser import parse_srt_text
 from trendsubs.core.word_timing import split_cue_into_word_slices
@@ -54,6 +54,59 @@ def render_subtitled_video(
 
 def _run_command(command: list[str]) -> None:
     subprocess.run(command, check=True)
+
+
+def render_preview_frame(
+    video_path: Path,
+    srt_path: Path,
+    output_image_path: Path,
+    options: RenderOptions,
+    at_seconds: float = 1.5,
+    command_runner=None,
+) -> Path:
+    cues = parse_srt_text(srt_path.read_text(encoding="utf-8-sig"))
+    for cue in cues:
+        cue.word_slices = split_cue_into_word_slices(
+            text=cue.text.replace("\n", " "),
+            start_ms=cue.start_ms,
+            end_ms=cue.end_ms,
+        )
+    preview_seconds = _resolve_preview_seconds(cues, requested_seconds=at_seconds)
+
+    play_res = _probe_video_resolution(video_path)
+    ass_text = build_ass_document(cues, options, play_res=play_res)
+    ass_path = output_image_path.with_suffix(".preview.ass")
+    ass_path.write_text(ass_text, encoding="utf-8")
+
+    runner = command_runner or _run_command
+    command = build_preview_command(
+        video_path=video_path,
+        ass_path=ass_path,
+        output_image_path=output_image_path,
+        at_seconds=preview_seconds,
+        font_path=Path(options.font_path),
+    )
+    runner(command)
+    ass_path.unlink(missing_ok=True)
+    return output_image_path
+
+
+def _resolve_preview_seconds(cues: list, requested_seconds: float) -> float:
+    normalized_seconds = max(0.0, requested_seconds)
+    requested_ms = round(normalized_seconds * 1000)
+    if not cues:
+        return normalized_seconds
+
+    for cue in cues:
+        if cue.start_ms <= requested_ms <= cue.end_ms:
+            return normalized_seconds
+
+    nearest_cue = min(
+        cues,
+        key=lambda cue: abs(((cue.start_ms + cue.end_ms) // 2) - requested_ms),
+    )
+    midpoint_ms = (nearest_cue.start_ms + nearest_cue.end_ms) // 2
+    return midpoint_ms / 1000.0
 
 
 def _probe_video_resolution(video_path: Path) -> tuple[int, int]:
