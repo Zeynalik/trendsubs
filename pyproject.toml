@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trendsubs"
+version = "0.1.0"
+description = "CLI and desktop app for trendy burned-in subtitles."
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+  "fonttools>=4.58.0",
+  "pysubs2>=1.7.3",
+  "PySide6>=6.9.0",
+  "typer>=0.16.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.5",
+]
+
+[project.scripts]
+trendsubs = "trendsubs.cli:app"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

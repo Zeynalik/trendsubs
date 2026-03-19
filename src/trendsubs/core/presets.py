@@ -1,0 +1,35 @@
+from __future__ import annotations
+
+
+PRESETS: dict[str, dict[str, str | int]] = {
+    "social-pop": {
+        "style_name": "SocialPop",
+        "primary_color": "&H00FFFFFF",
+        "outline_color": "&H00101010",
+        "accent_color": "&H004DD8FF",
+        "bold": 1,
+        "outline": 3,
+        "shadow": 0,
+        "alignment": 2,
+    },
+    "clean-pro": {
+        "style_name": "CleanPro",
+        "primary_color": "&H00FFFFFF",
+        "outline_color": "&H000F0F0F",
+        "accent_color": "&H00FFD7A4",
+        "bold": 0,
+        "outline": 2,
+        "shadow": 0,
+        "alignment": 2,
+    },
+    "impact-caps": {
+        "style_name": "ImpactCaps",
+        "primary_color": "&H00FFFFFF",
+        "outline_color": "&H00000000",
+        "accent_color": "&H004DB5FF",
+        "bold": 1,
+        "outline": 4,
+        "shadow": 0,
+        "alignment": 2,
+    },
+}
