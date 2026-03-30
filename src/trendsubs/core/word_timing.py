@@ -29,7 +29,7 @@ def split_cue_into_word_slices(text: str, start_ms: int, end_ms: int) -> list[Wo
                 text=token,
                 start_ms=cursor,
                 end_ms=next_cursor,
-                is_punctuation=token[-1] in PUNCTUATION_CHARS,
+                is_punctuation=all(char in PUNCTUATION_CHARS for char in token),
             )
         )
         cursor = next_cursor

@@ -115,7 +115,9 @@ class TrendSubsWindow(QWidget):
         self.preset_combo = QComboBox()
         self.preset_combo.addItems(build_preset_names())
         self.mode_combo = QComboBox()
-        self.mode_combo.addItems(["highlight", "reveal"])
+        self.mode_combo.addItems(["highlight", "reveal", "word"])
+        self.animation_combo = QComboBox()
+        self.animation_combo.addItems(["none", "pop-bounce"])
 
         self.render_button = QPushButton("Render")
         self.render_button.clicked.connect(self.run_render)
@@ -133,6 +135,7 @@ class TrendSubsWindow(QWidget):
         form.addRow("Font", _build_path_row(self.font_combo, self.font_pick_button))
         form.addRow("Preset", self.preset_combo)
         form.addRow("Mode", self.mode_combo)
+        form.addRow("Animation", self.animation_combo)
         form.addRow("Color", self.color_combo)
         form.addRow("Size", self.size_input)
         form.addRow("Bottom Margin", self.margin_input)
@@ -306,6 +309,7 @@ class TrendSubsWindow(QWidget):
             bottom_margin=bottom_margin,
             keep_ass=False,
             mode=self.mode_combo.currentText(),
+            animation=self.animation_combo.currentText(),
             max_words_per_line=max(0, max_words),
             max_words_per_caption=max(0, max_caption_words),
             safe_area_offset=max(0, safe_area_offset),

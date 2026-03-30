@@ -288,3 +288,101 @@ def test_build_ass_document_highlight_mode_uses_accent_as_primary_color():
     ass_text = build_ass_document([cue], options, play_res=(1920, 1080))
 
     assert "&H004DD8FF,&H00FFFFFF" in ass_text
+
+
+def test_build_ass_document_pop_bounce_animation_adds_transform_tags():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=1000,
+        end_ms=2000,
+        text="hello world",
+        lines=["hello world"],
+    )
+    cue.word_slices = [
+        WordSlice(text="hello", start_ms=1000, end_ms=1500, is_punctuation=False),
+        WordSlice(text="world", start_ms=1500, end_ms=2000, is_punctuation=False),
+    ]
+    options = RenderOptions(
+        preset="social-pop",
+        font_path="C:\\Fonts\\MyFont.ttf",
+        accent_color="#FFD84D",
+        font_size=40,
+        bottom_margin=120,
+        keep_ass=False,
+        mode="highlight",
+        animation="pop-bounce",
+    )
+
+    ass_text = build_ass_document([cue], options, play_res=(1920, 1080))
+
+    assert r"\alpha&H80&" in ass_text
+    assert r"\fscx112" in ass_text
+    assert r"\fscy116" in ass_text
+
+
+def test_build_ass_document_word_mode_emits_one_dialogue_per_word():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=1000,
+        end_ms=3000,
+        text="one two three",
+        lines=["one two three"],
+    )
+    cue.word_slices = [
+        WordSlice(text="one", start_ms=1000, end_ms=1600, is_punctuation=False),
+        WordSlice(text="two", start_ms=1600, end_ms=2200, is_punctuation=False),
+        WordSlice(text="three", start_ms=2200, end_ms=3000, is_punctuation=False),
+    ]
+    options = RenderOptions(
+        preset="social-pop",
+        font_path="C:\\Fonts\\MyFont.ttf",
+        accent_color="#FFD84D",
+        font_size=40,
+        bottom_margin=120,
+        keep_ass=False,
+        mode="word",
+        animation="pop-bounce",
+    )
+
+    ass_text = build_ass_document([cue], options, play_res=(1920, 1080))
+    dialogue_lines = [line for line in ass_text.splitlines() if line.startswith("Dialogue:")]
+
+    assert len(dialogue_lines) == 3
+    assert dialogue_lines[0].endswith("one")
+    assert dialogue_lines[1].endswith("two")
+    assert dialogue_lines[2].endswith("three")
+    assert r"\alpha&H80&" in ass_text
+
+
+def test_build_ass_document_word_mode_removes_commas_and_keeps_words_separate():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=1000,
+        end_ms=2600,
+        text="izobreli posudomoyku, robot-pylesos, aerogril,",
+        lines=["izobreli posudomoyku, robot-pylesos, aerogril,"],
+    )
+    cue.word_slices = [
+        WordSlice(text="izobreli", start_ms=1000, end_ms=1400, is_punctuation=False),
+        WordSlice(text="posudomoyku,", start_ms=1400, end_ms=1800, is_punctuation=False),
+        WordSlice(text="robot-pylesos,", start_ms=1800, end_ms=2200, is_punctuation=False),
+        WordSlice(text="aerogril,", start_ms=2200, end_ms=2600, is_punctuation=False),
+    ]
+    options = RenderOptions(
+        preset="social-pop",
+        font_path="C:\\Fonts\\MyFont.ttf",
+        accent_color="#FFD84D",
+        font_size=40,
+        bottom_margin=120,
+        keep_ass=False,
+        mode="word",
+    )
+
+    ass_text = build_ass_document([cue], options, play_res=(1920, 1080))
+    dialogue_lines = [line for line in ass_text.splitlines() if line.startswith("Dialogue:")]
+
+    assert len(dialogue_lines) == 4
+    assert dialogue_lines[0].endswith("izobreli")
+    assert dialogue_lines[1].endswith("posudomoyku")
+    assert dialogue_lines[2].endswith("robot-pylesos")
+    assert dialogue_lines[3].endswith("aerogril")

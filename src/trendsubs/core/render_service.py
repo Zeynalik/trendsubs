@@ -133,8 +133,7 @@ def _apply_caption_word_limit(cues: list[SubtitleCue], max_words_per_caption: in
             index += 1
             continue
 
-        for chunk_start in range(0, len(words), max_words_per_caption):
-            chunk = words[chunk_start : chunk_start + max_words_per_caption]
+        for chunk in _balanced_word_chunks(words, max_words_per_caption=max_words_per_caption):
             if not chunk:
                 continue
 
@@ -152,6 +151,25 @@ def _apply_caption_word_limit(cues: list[SubtitleCue], max_words_per_caption: in
             index += 1
 
     return limited
+
+
+def _balanced_word_chunks(words: list, max_words_per_caption: int) -> list[list]:
+    if len(words) <= max_words_per_caption:
+        return [words]
+
+    chunk_count = (len(words) + max_words_per_caption - 1) // max_words_per_caption
+    base_size = len(words) // chunk_count
+    remainder = len(words) % chunk_count
+
+    chunks: list[list] = []
+    cursor = 0
+    for index in range(chunk_count):
+        size = base_size + (1 if index < remainder else 0)
+        next_cursor = cursor + size
+        chunks.append(words[cursor:next_cursor])
+        cursor = next_cursor
+
+    return [chunk for chunk in chunks if chunk]
 
 
 def _probe_video_resolution(video_path: Path) -> tuple[int, int]:

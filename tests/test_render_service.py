@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from trendsubs.core.models import RenderOptions
-from trendsubs.core.render_service import render_preview_frame, render_subtitled_video
+from trendsubs.core.models import RenderOptions, SubtitleCue, WordSlice
+from trendsubs.core.render_service import _apply_caption_word_limit, render_preview_frame, render_subtitled_video
 
 
 def test_render_subtitled_video_generates_ass_and_invokes_ffmpeg(tmp_path: Path):
@@ -114,6 +114,31 @@ def test_render_subtitled_video_splits_long_cue_by_max_words_per_caption(tmp_pat
     ass_text = result.ass_path.read_text(encoding="utf-8")
     dialogue_lines = [line for line in ass_text.splitlines() if line.startswith("Dialogue:")]
     assert len(dialogue_lines) == 3
+
+
+def test_apply_caption_word_limit_balances_chunks_without_one_word_tail():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=0,
+        end_ms=600,
+        text="one two three four five six",
+        lines=["one two three four five six"],
+        word_slices=[
+            WordSlice(text="one", start_ms=0, end_ms=100, is_punctuation=False),
+            WordSlice(text="two", start_ms=100, end_ms=200, is_punctuation=False),
+            WordSlice(text="three", start_ms=200, end_ms=300, is_punctuation=False),
+            WordSlice(text="four", start_ms=300, end_ms=400, is_punctuation=False),
+            WordSlice(text="five", start_ms=400, end_ms=500, is_punctuation=False),
+            WordSlice(text="six", start_ms=500, end_ms=600, is_punctuation=False),
+        ],
+    )
+
+    limited = _apply_caption_word_limit([cue], max_words_per_caption=5)
+
+    assert len(limited) == 2
+    assert [len(chunk.word_slices) for chunk in limited] == [3, 3]
+    assert limited[0].text == "one two three"
+    assert limited[1].text == "four five six"
 
 
 def test_render_preview_frame_runs_ffmpeg_preview_and_cleans_ass(tmp_path: Path):

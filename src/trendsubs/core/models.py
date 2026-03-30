@@ -30,6 +30,7 @@ class RenderOptions:
     bottom_margin: int
     keep_ass: bool
     mode: str = "highlight"
+    animation: str = "none"
     max_words_per_line: int = 0
     max_words_per_caption: int = 0
     safe_area_offset: int = 0

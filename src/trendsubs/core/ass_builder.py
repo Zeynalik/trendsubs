@@ -60,6 +60,7 @@ def build_ass_document(
         cues=cues,
         style_name=style_name,
         mode=options.mode,
+        animation=options.animation,
         preset=options.preset,
         max_words_per_line=options.max_words_per_line,
     )
@@ -70,6 +71,7 @@ def _build_dialogue_lines(
     cues: list[SubtitleCue],
     style_name: str,
     mode: str,
+    animation: str,
     preset: str,
     max_words_per_line: int,
 ) -> list[str]:
@@ -80,18 +82,30 @@ def _build_dialogue_lines(
                 _build_reveal_dialogue_lines(
                     cue=cue,
                     style_name=style_name,
+                    animation=animation,
                     preset=preset,
                     max_words_per_line=max_words_per_line,
                 )
             )
             continue
+        if mode == "word":
+            dialogue_lines.extend(
+                _build_word_dialogue_lines(
+                    cue=cue,
+                    style_name=style_name,
+                    animation=animation,
+                    preset=preset,
+                )
+            )
+            continue
 
         break_indices = _resolve_line_break_indices(cue, max_words_per_line=max_words_per_line)
+        animation_prefix = _build_animation_prefix(cue.start_ms, cue.end_ms, animation)
         dialogue_lines.append(
             "Dialogue: 0,"
             f"{_format_ass_timestamp(cue.start_ms)},{_format_ass_timestamp(cue.end_ms)},{style_name},,"
             "0,0,0,,"
-            f"{_build_karaoke_text(cue, preset, break_indices)}"
+            f"{animation_prefix}{_build_karaoke_text(cue, preset, break_indices)}"
         )
     return dialogue_lines
 
@@ -111,6 +125,7 @@ def _build_karaoke_text(cue: SubtitleCue, preset: str, break_indices: list[int])
 def _build_reveal_dialogue_lines(
     cue: SubtitleCue,
     style_name: str,
+    animation: str,
     preset: str,
     max_words_per_line: int,
 ) -> list[str]:
@@ -126,14 +141,112 @@ def _build_reveal_dialogue_lines(
         start_ms = word.start_ms
         end_ms = max(start_ms + 1, next_start)
         revealed = _join_words_with_breaks(words[: index + 1], break_indices)
+        animation_prefix = _build_animation_prefix(start_ms, end_ms, animation)
         dialogue_lines.append(
             "Dialogue: 0,"
             f"{_format_ass_timestamp(start_ms)},{_format_ass_timestamp(end_ms)},{style_name},,"
             "0,0,0,,"
-            f"{revealed}"
+            f"{animation_prefix}{revealed}"
         )
 
     return dialogue_lines
+
+
+def _build_word_dialogue_lines(
+    cue: SubtitleCue,
+    style_name: str,
+    animation: str,
+    preset: str,
+) -> list[str]:
+    if not cue.word_slices:
+        return []
+
+    word_units = _build_word_units(cue, preset)
+    word_units = _group_word_units_for_readability(word_units, cue_end_ms=cue.end_ms, min_display_ms=180)
+    dialogue_lines: list[str] = []
+    for index, unit in enumerate(word_units):
+        next_start = word_units[index + 1]["start_ms"] if index + 1 < len(word_units) else cue.end_ms
+        start_ms = unit["start_ms"]
+        end_ms = max(start_ms + 1, next_start)
+        animation_prefix = _build_animation_prefix(start_ms, end_ms, animation)
+        dialogue_lines.append(
+            "Dialogue: 0,"
+            f"{_format_ass_timestamp(start_ms)},{_format_ass_timestamp(end_ms)},{style_name},,"
+            "0,0,0,,"
+            f"{animation_prefix}{unit['text']}"
+        )
+
+    return dialogue_lines
+
+
+def _build_word_units(cue: SubtitleCue, preset: str) -> list[dict[str, int | str]]:
+    units: list[dict[str, int | str]] = []
+    for word in cue.word_slices:
+        token = word.text.upper() if preset == "impact-caps" else word.text
+        token = _strip_word_mode_punctuation(token)
+        if not token:
+            continue
+        if word.is_punctuation and units:
+            units[-1]["text"] = str(units[-1]["text"]) + token
+            units[-1]["end_ms"] = word.end_ms
+            continue
+        units.append(
+            {
+                "text": token,
+                "start_ms": word.start_ms,
+                "end_ms": word.end_ms,
+            }
+        )
+    return units
+
+
+def _group_word_units_for_readability(
+    units: list[dict[str, int | str]],
+    cue_end_ms: int,
+    min_display_ms: int,
+) -> list[dict[str, int | str]]:
+    if len(units) < 2:
+        return units
+
+    grouped: list[dict[str, int | str]] = []
+    index = 0
+    while index < len(units):
+        start_ms = int(units[index]["start_ms"])
+        end_ms = int(units[index]["end_ms"])
+        words = [str(units[index]["text"])]
+        lookahead = index + 1
+        while lookahead < len(units):
+            next_start = int(units[lookahead]["start_ms"])
+            if next_start - start_ms >= min_display_ms:
+                break
+            words.append(str(units[lookahead]["text"]))
+            end_ms = int(units[lookahead]["end_ms"])
+            lookahead += 1
+
+        grouped.append(
+            {
+                "text": " ".join(word for word in words if word),
+                "start_ms": start_ms,
+                "end_ms": end_ms,
+            }
+        )
+        index = lookahead
+
+    if grouped:
+        while len(grouped) > 1:
+            last_duration = int(grouped[-1]["end_ms"]) - int(grouped[-1]["start_ms"])
+            if last_duration >= min_display_ms:
+                break
+            grouped[-2]["text"] = f"{grouped[-2]['text']} {grouped[-1]['text']}".strip()
+            grouped[-2]["end_ms"] = grouped[-1]["end_ms"]
+            grouped.pop()
+        grouped[-1]["end_ms"] = max(int(grouped[-1]["end_ms"]), cue_end_ms)
+    return grouped
+
+
+def _strip_word_mode_punctuation(token: str) -> str:
+    # Fast short-form subtitles: remove commas and periods from displayed words.
+    return token.replace(",", "").replace(".", "").strip()
 
 
 def _resolve_line_break_indices(cue: SubtitleCue, max_words_per_line: int) -> list[int]:
@@ -189,6 +302,22 @@ def _join_words_with_breaks(words: list[str], break_indices: list[int]) -> str:
     if tail:
         chunks.append(tail)
     return "\\N".join(chunks)
+
+
+def _build_animation_prefix(start_ms: int, end_ms: int, animation: str) -> str:
+    if animation != "pop-bounce":
+        return ""
+
+    duration_ms = max(1, end_ms - start_ms)
+    pop_end = min(140, duration_ms)
+    settle_end = min(duration_ms, pop_end + 120)
+    return (
+        "{"
+        r"\alpha&H80&\fscx88\fscy88"
+        rf"\t(0,{pop_end},\alpha&H00&\fscx112\fscy116)"
+        rf"\t({pop_end},{settle_end},\fscx100\fscy100)"
+        "}"
+    )
 
 
 def _format_ass_timestamp(milliseconds: int) -> str:

@@ -6,7 +6,14 @@ from trendsubs.gui.window import TrendSubsWindow, build_color_names, build_prese
 
 
 def test_build_preset_names_exposes_all_default_presets():
-    assert build_preset_names() == ["social-pop", "clean-pro", "impact-caps"]
+    assert build_preset_names() == [
+        "social-pop",
+        "clean-pro",
+        "impact-caps",
+        "hook-pop",
+        "neon-glow",
+        "podcast-clean",
+    ]
 
 
 def test_build_color_names_exposes_available_colors():
@@ -23,9 +30,10 @@ def test_trendsubs_window_builds_expected_form_fields():
     assert window.srt_input.placeholderText() == "Select subtitle file"
     assert window.output_dir_input.placeholderText() == "Choose output folder"
     assert window.output_name_input.placeholderText() == "Output file name (without .mp4)"
-    assert window.preset_combo.count() == 3
+    assert window.preset_combo.count() == 6
     assert window.color_combo.count() == 3
-    assert window.mode_combo.count() == 2
+    assert window.mode_combo.count() == 3
+    assert window.animation_combo.count() == 2
     assert window.font_combo.count() >= 1
     assert window.auto_scale_check.isChecked() is True
     assert window.render_button.text() == "Render"
@@ -67,6 +75,7 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     window.output_dir_input.setText(str(tmp_path))
     window.font_combo.setCurrentIndex(font_index)
     window.mode_combo.setCurrentText("reveal")
+    window.animation_combo.setCurrentText("pop-bounce")
     window.max_words_input.setText("3")
     window.max_caption_words_input.setText("8")
     window.safe_area_input.setText("15")
@@ -77,6 +86,7 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     assert called["srt_path"] == srt_path
     assert called["output_path"] == output_path
     assert called["options"].mode == "reveal"
+    assert called["options"].animation == "pop-bounce"
     assert called["options"].max_words_per_line == 3
     assert called["options"].max_words_per_caption == 8
     assert called["options"].safe_area_offset == 15

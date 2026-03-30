@@ -37,6 +37,8 @@ def test_cli_render_invokes_shared_service(tmp_path, monkeypatch):
             str(font_path),
             "--mode",
             "reveal",
+            "--animation",
+            "pop-bounce",
             "--max-words-per-line",
             "3",
             "--max-words-per-caption",
@@ -52,6 +54,7 @@ def test_cli_render_invokes_shared_service(tmp_path, monkeypatch):
     assert called["srt_path"] == srt_path
     assert called["output_path"] == output_path
     assert called["options"].mode == "reveal"
+    assert called["options"].animation == "pop-bounce"
     assert called["options"].max_words_per_line == 3
     assert called["options"].max_words_per_caption == 8
     assert called["options"].safe_area_offset == 24
