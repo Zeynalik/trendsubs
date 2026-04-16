@@ -1,8 +1,17 @@
 import os
 
+import pytest
 from PySide6.QtWidgets import QApplication
 
 from trendsubs.gui.window import TrendSubsWindow, build_color_names, build_preset_names
+
+
+@pytest.fixture(autouse=True)
+def _isolate_gui_state_file(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "trendsubs.gui.window._settings_file_path",
+        lambda: tmp_path / "gui_state.json",
+    )
 
 
 def test_build_preset_names_exposes_all_default_presets():
@@ -31,15 +40,114 @@ def test_trendsubs_window_builds_expected_form_fields():
     assert window.output_dir_input.placeholderText() == "Choose output folder"
     assert window.output_name_input.placeholderText() == "Output file name (without .mp4)"
     assert window.preset_combo.count() == 6
-    assert window.color_combo.count() == 3
+    assert window.color_combo.count() == 4
     assert window.mode_combo.count() == 3
-    assert window.animation_combo.count() == 2
+    assert window.animation_combo.count() == 4
     assert window.font_combo.count() >= 1
     assert window.auto_scale_check.isChecked() is True
+    assert window.memes_enabled_check.isChecked() is False
     assert window.render_button.text() == "Render"
     assert window.preview_button.text() == "Preview Frame"
     assert window.size_input.text() == "40"
     assert window.max_caption_words_input.text() == "0"
+    app.quit()
+
+
+def test_trendsubs_window_uses_preset_accent_color_when_color_is_preset():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+
+    window = TrendSubsWindow()
+    window.preset_combo.setCurrentText("hook-pop")
+    window.color_combo.setCurrentText("Preset")
+    options = window._build_render_options()
+
+    assert options is not None
+    assert options.accent_color == "#FFD24A"
+    app.quit()
+
+
+def test_trendsubs_window_preview_logs_animation_notice(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+
+    video_path = tmp_path / "video.mp4"
+    srt_path = tmp_path / "subs.srt"
+    font_path = tmp_path / "font.ttf"
+    output_path = tmp_path / "out.mp4"
+    preview_path = output_path.with_suffix(".preview.png")
+    video_path.write_bytes(b"video")
+    srt_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n", encoding="utf-8")
+    font_path.write_bytes(b"font")
+
+    monkeypatch.setattr(
+        "trendsubs.gui.window.render_preview_frame",
+        lambda **kwargs: preview_path.write_bytes(b"png"),
+    )
+
+    window = TrendSubsWindow()
+    font_index = window.font_combo.findData(str(font_path.resolve()))
+    if font_index < 0:
+        window.font_combo.addItem(font_path.stem, str(font_path.resolve()))
+        font_index = window.font_combo.count() - 1
+
+    window.video_input.setText(str(video_path))
+    window.srt_input.setText(str(srt_path))
+    window.output_input.setText(str(output_path))
+    window.output_dir_input.setText(str(tmp_path))
+    window.font_combo.setCurrentIndex(font_index)
+    window.animation_combo.setCurrentText("float")
+    window.run_preview()
+
+    assert "Preview Frame is static" in window.log_output.toPlainText()
+    app.quit()
+
+
+def test_trendsubs_window_persists_settings_except_video_and_srt(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+
+    settings_file = tmp_path / "gui_state.json"
+    monkeypatch.setattr(
+        "trendsubs.gui.window._settings_file_path",
+        lambda: settings_file,
+    )
+
+    first_window = TrendSubsWindow()
+    first_window.video_input.setText(str(tmp_path / "video.mp4"))
+    first_window.srt_input.setText(str(tmp_path / "subs.srt"))
+    first_window.output_dir_input.setText(str(tmp_path / "renders"))
+    first_window.output_name_input.setText("final_name")
+    first_window.preset_combo.setCurrentText("hook-pop")
+    first_window.mode_combo.setCurrentText("reveal")
+    first_window.animation_combo.setCurrentText("pop-bounce")
+    first_window.color_combo.setCurrentText("Red")
+    first_window.size_input.setText("56")
+    first_window.margin_input.setText("220")
+    first_window.safe_area_input.setText("30")
+    first_window.max_words_input.setText("2")
+    first_window.max_caption_words_input.setText("7")
+    first_window.preview_time_input.setText("4.5")
+    first_window.auto_scale_check.setChecked(False)
+    first_window.close()
+
+    second_window = TrendSubsWindow()
+    assert second_window.video_input.text() == ""
+    assert second_window.srt_input.text() == ""
+    assert second_window.output_dir_input.text() == str(tmp_path / "renders")
+    assert second_window.output_name_input.text() == "final_name"
+    assert second_window.preset_combo.currentText() == "hook-pop"
+    assert second_window.mode_combo.currentText() == "reveal"
+    assert second_window.animation_combo.currentText() == "pop-bounce"
+    assert second_window.color_combo.currentText() == "Red"
+    assert second_window.size_input.text() == "56"
+    assert second_window.margin_input.text() == "220"
+    assert second_window.safe_area_input.text() == "30"
+    assert second_window.max_words_input.text() == "2"
+    assert second_window.max_caption_words_input.text() == "7"
+    assert second_window.preview_time_input.text() == "4.5"
+    assert second_window.auto_scale_check.isChecked() is False
+    second_window.close()
     app.quit()
 
 
@@ -91,7 +199,46 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     assert called["options"].max_words_per_caption == 8
     assert called["options"].safe_area_offset == 15
     assert called["options"].auto_font_scale is False
+    assert called["options"].memes_enabled is False
     assert "Rendered video" in window.log_output.toPlainText()
+    app.quit()
+
+
+def test_trendsubs_window_run_render_can_enable_tenor_memes(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+
+    video_path = tmp_path / "video.mp4"
+    srt_path = tmp_path / "subs.srt"
+    font_path = tmp_path / "font.ttf"
+    output_path = tmp_path / "out.mp4"
+    video_path.write_bytes(b"video")
+    srt_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n", encoding="utf-8")
+    font_path.write_bytes(b"font")
+
+    called = {}
+
+    def fake_render(**kwargs):
+        called.update(kwargs)
+        return None
+
+    monkeypatch.setattr("trendsubs.gui.window.render_subtitled_video", fake_render)
+
+    window = TrendSubsWindow()
+    font_index = window.font_combo.findData(str(font_path.resolve()))
+    if font_index < 0:
+        window.font_combo.addItem(font_path.stem, str(font_path.resolve()))
+        font_index = window.font_combo.count() - 1
+
+    window.video_input.setText(str(video_path))
+    window.srt_input.setText(str(srt_path))
+    window.output_input.setText(str(output_path))
+    window.output_dir_input.setText(str(tmp_path))
+    window.font_combo.setCurrentIndex(font_index)
+    window.memes_enabled_check.setChecked(True)
+    window.run_render()
+
+    assert called["options"].memes_enabled is True
     app.quit()
 
 

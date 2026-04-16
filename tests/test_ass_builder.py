@@ -320,6 +320,67 @@ def test_build_ass_document_pop_bounce_animation_adds_transform_tags():
     assert r"\fscy116" in ass_text
 
 
+def test_build_ass_document_float_animation_adds_soft_transform_tags():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=1000,
+        end_ms=2000,
+        text="hello world",
+        lines=["hello world"],
+    )
+    cue.word_slices = [
+        WordSlice(text="hello", start_ms=1000, end_ms=1500, is_punctuation=False),
+        WordSlice(text="world", start_ms=1500, end_ms=2000, is_punctuation=False),
+    ]
+    options = RenderOptions(
+        preset="social-pop",
+        font_path="C:\\Fonts\\MyFont.ttf",
+        accent_color="#FFD84D",
+        font_size=40,
+        bottom_margin=120,
+        keep_ass=False,
+        mode="highlight",
+        animation="float",
+    )
+
+    ass_text = build_ass_document([cue], options, play_res=(1920, 1080))
+
+    assert r"\fscx100\fscy100" in ass_text
+    assert r"\t(0,280,\fscx102\fscy102)" in ass_text
+    assert r"\t(280,540,\fscx100\fscy100)" in ass_text
+
+
+def test_build_ass_document_pop_float_animation_combines_both_effects():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=1000,
+        end_ms=2000,
+        text="hello world",
+        lines=["hello world"],
+    )
+    cue.word_slices = [
+        WordSlice(text="hello", start_ms=1000, end_ms=1500, is_punctuation=False),
+        WordSlice(text="world", start_ms=1500, end_ms=2000, is_punctuation=False),
+    ]
+    options = RenderOptions(
+        preset="social-pop",
+        font_path="C:\\Fonts\\MyFont.ttf",
+        accent_color="#FFD84D",
+        font_size=40,
+        bottom_margin=120,
+        keep_ass=False,
+        mode="highlight",
+        animation="pop-float",
+    )
+
+    ass_text = build_ass_document([cue], options, play_res=(1920, 1080))
+
+    assert r"\alpha&H80&" in ass_text
+    assert r"\t(0,140,\alpha&H00&\fscx112\fscy116)" in ass_text
+    assert r"\t(260,500,\fscx102\fscy102)" in ass_text
+    assert r"\t(500,760,\fscx100\fscy100)" in ass_text
+
+
 def test_build_ass_document_word_mode_emits_one_dialogue_per_word():
     cue = SubtitleCue(
         index=1,

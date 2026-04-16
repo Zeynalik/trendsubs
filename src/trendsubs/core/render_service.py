@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 import subprocess
+import tempfile
 
 from trendsubs.core.ass_builder import build_ass_document
 from trendsubs.core.ffmpeg_runner import build_ffmpeg_command, build_preview_command
-from trendsubs.core.models import RenderOptions, SubtitleCue
+from trendsubs.core.models import MemeOverlay, RenderOptions, SubtitleCue
 from trendsubs.core.srt_parser import parse_srt_text
+from trendsubs.core.tenor_memes import resolve_tenor_memes
 from trendsubs.core.word_timing import split_cue_into_word_slices
 
 
@@ -38,13 +41,34 @@ def render_subtitled_video(
     ass_path.write_text(ass_text, encoding="utf-8")
 
     runner = command_runner or _run_command
-    command = build_ffmpeg_command(
-        video_path=video_path,
-        ass_path=ass_path,
-        output_path=output_path,
-        font_path=Path(options.font_path),
-    )
-    runner(command)
+    meme_overlays: list[MemeOverlay] = []
+    temp_dir: tempfile.TemporaryDirectory[str] | None = None
+    try:
+        if options.memes_enabled:
+            api_key = options.tenor_api_key.strip() or os.getenv("TENOR_API_KEY", "").strip()
+            if api_key:
+                temp_dir = tempfile.TemporaryDirectory(prefix="trendsubs_memes_")
+                try:
+                    meme_overlays = resolve_tenor_memes(
+                        cues=cues,
+                        output_dir=Path(temp_dir.name),
+                        api_key=api_key,
+                        max_memes=max(0, options.max_memes),
+                    )
+                except Exception:
+                    meme_overlays = []
+
+        command = build_ffmpeg_command(
+            video_path=video_path,
+            ass_path=ass_path,
+            output_path=output_path,
+            font_path=Path(options.font_path),
+            meme_overlays=meme_overlays,
+        )
+        runner(command)
+    finally:
+        if temp_dir is not None:
+            temp_dir.cleanup()
 
     if not options.keep_ass:
         ass_path.unlink(missing_ok=True)

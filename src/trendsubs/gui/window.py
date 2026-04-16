@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 
+from PySide6.QtGui import QCloseEvent
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -33,6 +36,24 @@ COLOR_OPTIONS: dict[str, str] = {
 
 def build_color_names() -> list[str]:
     return list(COLOR_OPTIONS.keys())
+
+
+def _preset_accent_hex(preset_name: str) -> str:
+    preset = PRESETS.get(preset_name)
+    if not preset:
+        return "#FFD84D"
+    ass_color = str(preset.get("accent_color", "") or "")
+    normalized = ass_color.replace("&H", "").upper()
+    if len(normalized) == 8:
+        blue = normalized[2:4]
+        green = normalized[4:6]
+        red = normalized[6:8]
+        return f"#{red}{green}{blue}"
+    return "#FFD84D"
+
+
+def _settings_file_path() -> Path:
+    return Path.home() / ".trendsubs" / "gui_state.json"
 
 
 def discover_font_paths() -> list[str]:
@@ -101,6 +122,7 @@ class TrendSubsWindow(QWidget):
             self.font_combo.addItem("No font selected", "")
 
         self.color_combo = QComboBox()
+        self.color_combo.addItem("Preset", "__preset__")
         for color_name in build_color_names():
             self.color_combo.addItem(color_name, COLOR_OPTIONS[color_name])
         self.size_input = QLineEdit("40")
@@ -111,13 +133,15 @@ class TrendSubsWindow(QWidget):
         self.preview_time_input = QLineEdit("10")
         self.auto_scale_check = QCheckBox("Auto scale font")
         self.auto_scale_check.setChecked(True)
+        self.memes_enabled_check = QCheckBox("Memes (Tenor)")
+        self.memes_enabled_check.setChecked(False)
 
         self.preset_combo = QComboBox()
         self.preset_combo.addItems(build_preset_names())
         self.mode_combo = QComboBox()
         self.mode_combo.addItems(["highlight", "reveal", "word"])
         self.animation_combo = QComboBox()
-        self.animation_combo.addItems(["none", "pop-bounce"])
+        self.animation_combo.addItems(["none", "float", "pop-bounce", "pop-float"])
 
         self.render_button = QPushButton("Render")
         self.render_button.clicked.connect(self.run_render)
@@ -144,6 +168,7 @@ class TrendSubsWindow(QWidget):
         form.addRow("Max Words/Caption (0=off)", self.max_caption_words_input)
         form.addRow("Preview Time (sec)", self.preview_time_input)
         form.addRow("Auto Scale", self.auto_scale_check)
+        form.addRow("Memes", self.memes_enabled_check)
 
         layout = QVBoxLayout()
         layout.addLayout(form)
@@ -151,6 +176,11 @@ class TrendSubsWindow(QWidget):
         layout.addWidget(self.render_button)
         layout.addWidget(self.log_output)
         self.setLayout(layout)
+        self._load_persisted_state()
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._save_persisted_state()
+        super().closeEvent(event)
 
     def pick_video(self) -> None:
         selected, _ = QFileDialog.getOpenFileName(
@@ -245,6 +275,8 @@ class TrendSubsWindow(QWidget):
             output_path=output_path,
             options=options,
         )
+        if options.memes_enabled and not options.tenor_api_key:
+            self.log_output.append("TENOR_API_KEY not set. Rendered without memes.")
         self.log_output.append(f"Rendered video: {output_path}")
 
     def run_preview(self) -> None:
@@ -272,6 +304,9 @@ class TrendSubsWindow(QWidget):
         options = self._build_render_options()
         if options is None:
             return
+
+        if self.animation_combo.currentText() != "none":
+            self.log_output.append("Preview Frame is static. Animation is visible in rendered video.")
 
         try:
             preview_time = float(self.preview_time_input.text().strip() or "10")
@@ -304,7 +339,11 @@ class TrendSubsWindow(QWidget):
         return RenderOptions(
             preset=self.preset_combo.currentText(),
             font_path=str(font_path),
-            accent_color=str(self.color_combo.currentData() or "#FFD84D"),
+            accent_color=(
+                _preset_accent_hex(self.preset_combo.currentText())
+                if str(self.color_combo.currentData() or "") == "__preset__"
+                else str(self.color_combo.currentData() or "#FFD84D")
+            ),
             font_size=font_size,
             bottom_margin=bottom_margin,
             keep_ass=False,
@@ -314,10 +353,82 @@ class TrendSubsWindow(QWidget):
             max_words_per_caption=max(0, max_caption_words),
             safe_area_offset=max(0, safe_area_offset),
             auto_font_scale=self.auto_scale_check.isChecked(),
+            memes_enabled=self.memes_enabled_check.isChecked(),
+            max_memes=2,
+            tenor_api_key=os.getenv("TENOR_API_KEY", "").strip(),
         )
 
     def _selected_font_text(self) -> str:
         return str(self.font_combo.currentData() or "").strip()
+
+    def _save_persisted_state(self) -> None:
+        state = {
+            "output_input": self.output_input.text(),
+            "output_dir_input": self.output_dir_input.text(),
+            "output_name_input": self.output_name_input.text(),
+            "font_path": self._selected_font_text(),
+            "preset": self.preset_combo.currentText(),
+            "mode": self.mode_combo.currentText(),
+            "animation": self.animation_combo.currentText(),
+            "color": self.color_combo.currentText(),
+            "size": self.size_input.text(),
+            "margin": self.margin_input.text(),
+            "safe_area": self.safe_area_input.text(),
+            "max_words": self.max_words_input.text(),
+            "max_caption_words": self.max_caption_words_input.text(),
+            "preview_time": self.preview_time_input.text(),
+            "auto_scale": self.auto_scale_check.isChecked(),
+            "memes_enabled": self.memes_enabled_check.isChecked(),
+        }
+        settings_file = _settings_file_path()
+        settings_file.parent.mkdir(parents=True, exist_ok=True)
+        settings_file.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _load_persisted_state(self) -> None:
+        settings_file = _settings_file_path()
+        if not settings_file.exists():
+            return
+        try:
+            state = json.loads(settings_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return
+        if not isinstance(state, dict):
+            return
+
+        self.output_dir_input.setText(str(state.get("output_dir_input", "") or ""))
+        self.output_name_input.setText(str(state.get("output_name_input", "") or ""))
+        self.output_input.setText(str(state.get("output_input", "") or ""))
+
+        font_path = str(state.get("font_path", "") or "")
+        if font_path:
+            font_index = self.font_combo.findData(font_path)
+            if font_index < 0 and Path(font_path).exists():
+                self.font_combo.addItem(Path(font_path).stem, font_path)
+                font_index = self.font_combo.count() - 1
+            if font_index >= 0:
+                self.font_combo.setCurrentIndex(font_index)
+
+        for combo_name, combo in (
+            ("preset", self.preset_combo),
+            ("mode", self.mode_combo),
+            ("animation", self.animation_combo),
+            ("color", self.color_combo),
+        ):
+            saved_text = str(state.get(combo_name, "") or "")
+            index = combo.findText(saved_text)
+            if index >= 0:
+                combo.setCurrentIndex(index)
+
+        self.size_input.setText(str(state.get("size", self.size_input.text()) or self.size_input.text()))
+        self.margin_input.setText(str(state.get("margin", self.margin_input.text()) or self.margin_input.text()))
+        self.safe_area_input.setText(str(state.get("safe_area", self.safe_area_input.text()) or self.safe_area_input.text()))
+        self.max_words_input.setText(str(state.get("max_words", self.max_words_input.text()) or self.max_words_input.text()))
+        self.max_caption_words_input.setText(
+            str(state.get("max_caption_words", self.max_caption_words_input.text()) or self.max_caption_words_input.text())
+        )
+        self.preview_time_input.setText(str(state.get("preview_time", self.preview_time_input.text()) or self.preview_time_input.text()))
+        self.auto_scale_check.setChecked(bool(state.get("auto_scale", True)))
+        self.memes_enabled_check.setChecked(bool(state.get("memes_enabled", False)))
 
     def _sync_output_path_from_video(self) -> None:
         video_raw = _normalize_path_input(self.video_input.text())

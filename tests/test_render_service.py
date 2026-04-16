@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from trendsubs.core.models import RenderOptions, SubtitleCue, WordSlice
+from trendsubs.core.models import MemeOverlay, RenderOptions, SubtitleCue, WordSlice
 from trendsubs.core.render_service import _apply_caption_word_limit, render_preview_frame, render_subtitled_video
 
 
@@ -114,6 +114,54 @@ def test_render_subtitled_video_splits_long_cue_by_max_words_per_caption(tmp_pat
     ass_text = result.ass_path.read_text(encoding="utf-8")
     dialogue_lines = [line for line in ass_text.splitlines() if line.startswith("Dialogue:")]
     assert len(dialogue_lines) == 3
+
+
+def test_render_subtitled_video_resolves_tenor_memes_only_when_enabled(tmp_path: Path, monkeypatch):
+    srt_path = tmp_path / "input.srt"
+    video_path = tmp_path / "input.mp4"
+    font_path = tmp_path / "font.ttf"
+    output_path = tmp_path / "output.mp4"
+
+    srt_path.write_text(
+        "1\n00:00:01,000 --> 00:00:02,500\nwow what a goal\n",
+        encoding="utf-8",
+    )
+    video_path.write_bytes(b"video")
+    font_path.write_bytes(b"font")
+
+    captured: list[list[str]] = []
+    calls = {"resolver": 0}
+
+    def fake_runner(command: list[str]) -> None:
+        captured.append(command)
+
+    def fake_resolver(**_kwargs):
+        calls["resolver"] += 1
+        return [MemeOverlay(gif_path=tmp_path / "meme.gif", start_ms=1000, end_ms=2300)]
+
+    monkeypatch.setattr("trendsubs.core.render_service.resolve_tenor_memes", fake_resolver)
+    monkeypatch.setenv("TENOR_API_KEY", "fake-key")
+    (tmp_path / "meme.gif").write_bytes(b"gif")
+
+    render_subtitled_video(
+        video_path=video_path,
+        srt_path=srt_path,
+        output_path=output_path,
+        options=RenderOptions(
+            preset="social-pop",
+            font_path=str(font_path),
+            accent_color="#FFD84D",
+            font_size=64,
+            bottom_margin=120,
+            keep_ass=False,
+            memes_enabled=True,
+        ),
+        command_runner=fake_runner,
+    )
+
+    assert calls["resolver"] == 1
+    assert captured
+    assert "-filter_complex" in captured[0]
 
 
 def test_apply_caption_word_limit_balances_chunks_without_one_word_tail():

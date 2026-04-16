@@ -305,10 +305,37 @@ def _join_words_with_breaks(words: list[str], break_indices: list[int]) -> str:
 
 
 def _build_animation_prefix(start_ms: int, end_ms: int, animation: str) -> str:
+    duration_ms = max(1, end_ms - start_ms)
+
+    if animation == "float":
+        rise_end = min(280, duration_ms)
+        settle_end = min(duration_ms, rise_end + 260)
+        return (
+            "{"
+            r"\fscx100\fscy100"
+            rf"\t(0,{rise_end},\fscx102\fscy102)"
+            rf"\t({rise_end},{settle_end},\fscx100\fscy100)"
+            "}"
+        )
+
+    if animation == "pop-float":
+        pop_end = min(140, duration_ms)
+        settle_end = min(duration_ms, pop_end + 120)
+        float_up_end = min(duration_ms, settle_end + 240)
+        float_down_end = min(duration_ms, float_up_end + 260)
+        return (
+            "{"
+            r"\alpha&H80&\fscx88\fscy88"
+            rf"\t(0,{pop_end},\alpha&H00&\fscx112\fscy116)"
+            rf"\t({pop_end},{settle_end},\fscx100\fscy100)"
+            rf"\t({settle_end},{float_up_end},\fscx102\fscy102)"
+            rf"\t({float_up_end},{float_down_end},\fscx100\fscy100)"
+            "}"
+        )
+
     if animation != "pop-bounce":
         return ""
 
-    duration_ms = max(1, end_ms - start_ms)
     pop_end = min(140, duration_ms)
     settle_end = min(duration_ms, pop_end + 120)
     return (

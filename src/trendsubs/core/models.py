@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 
 @dataclass(slots=True)
@@ -22,6 +23,15 @@ class WordSlice:
 
 
 @dataclass(slots=True)
+class MemeOverlay:
+    gif_path: Path
+    start_ms: int
+    end_ms: int
+    x: int = 24
+    y: int = 24
+
+
+@dataclass(slots=True)
 class RenderOptions:
     preset: str
     font_path: str
@@ -35,3 +45,6 @@ class RenderOptions:
     max_words_per_caption: int = 0
     safe_area_offset: int = 0
     auto_font_scale: bool = True
+    memes_enabled: bool = False
+    max_memes: int = 2
+    tenor_api_key: str = ""
