@@ -12,6 +12,7 @@ from trendsubs.core.ffmpeg_runner import (
     build_preview_command,
 )
 from trendsubs.core.models import RenderOptions, SubtitleCue
+from trendsubs.core.presets import PRESETS
 from trendsubs.core.srt_parser import parse_srt_text
 from trendsubs.core.word_timing import split_cue_into_word_slices
 from trendsubs.core.word_jump_overlay import render_word_jump_frame, render_word_jump_overlay
@@ -48,6 +49,7 @@ def render_subtitled_video(
             cues=cues,
             auto_font_scale=options.auto_font_scale,
         )
+        style = _resolve_word_pill_style(options)
         try:
             render_word_jump_overlay(
                 cues=cues,
@@ -58,6 +60,11 @@ def render_subtitled_video(
                 bottom_margin=options.bottom_margin,
                 safe_area_offset=options.safe_area_offset,
                 max_words_per_line=options.max_words_per_line,
+                active_fill_color=style["active_fill_color"],
+                active_text_color=style["active_text_color"],
+                inactive_text_color=style["inactive_text_color"],
+                outline_color=style["outline_color"],
+                outline_width=style["outline_width"],
                 command_runner=runner,
             )
             command = build_overlay_command(
@@ -94,6 +101,50 @@ def _run_command(command: list[str]) -> None:
     subprocess.run(command, check=True)
 
 
+def _resolve_word_pill_style(options: RenderOptions) -> dict[str, tuple[int, int, int, int] | int]:
+    preset = PRESETS[options.preset]
+    active_fill = _hex_to_rgba(options.accent_color, alpha=235)
+    return {
+        "active_fill_color": active_fill,
+        "active_text_color": _contrast_text_color(active_fill),
+        "inactive_text_color": _ass_bgr_to_rgba(str(preset["primary_color"]), alpha=230),
+        "outline_color": _ass_bgr_to_rgba(str(preset["outline_color"]), alpha=230),
+        "outline_width": int(preset["outline"]),
+    }
+
+
+def _hex_to_rgba(color: str, *, alpha: int) -> tuple[int, int, int, int]:
+    normalized = color.strip().lstrip("#")
+    if len(normalized) != 6:
+        normalized = "FFD84D"
+    return (
+        int(normalized[0:2], 16),
+        int(normalized[2:4], 16),
+        int(normalized[4:6], 16),
+        alpha,
+    )
+
+
+def _ass_bgr_to_rgba(color: str, *, alpha: int) -> tuple[int, int, int, int]:
+    normalized = color.replace("&H", "").strip()
+    if len(normalized) != 8:
+        normalized = "00FFFFFF"
+    return (
+        int(normalized[6:8], 16),
+        int(normalized[4:6], 16),
+        int(normalized[2:4], 16),
+        alpha,
+    )
+
+
+def _contrast_text_color(background: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+    red, green, blue, _alpha = background
+    luminance = (0.299 * red) + (0.587 * green) + (0.114 * blue)
+    if luminance > 180:
+        return (0, 0, 0, 255)
+    return (255, 255, 255, 255)
+
+
 def render_preview_frame(
     video_path: Path,
     srt_path: Path,
@@ -122,6 +173,7 @@ def render_preview_frame(
             cues=cues,
             auto_font_scale=options.auto_font_scale,
         )
+        style = _resolve_word_pill_style(options)
         try:
             render_word_jump_frame(
                 cues=cues,
@@ -133,6 +185,11 @@ def render_preview_frame(
                 bottom_margin=options.bottom_margin,
                 safe_area_offset=options.safe_area_offset,
                 max_words_per_line=options.max_words_per_line,
+                active_fill_color=style["active_fill_color"],
+                active_text_color=style["active_text_color"],
+                inactive_text_color=style["inactive_text_color"],
+                outline_color=style["outline_color"],
+                outline_width=style["outline_width"],
             )
             command = build_overlay_preview_command(
                 video_path=video_path,

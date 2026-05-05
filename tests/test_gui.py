@@ -209,6 +209,36 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     app.quit()
 
 
+def test_trendsubs_window_run_render_logs_renderer_errors(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+
+    video_path = tmp_path / "video.mp4"
+    srt_path = tmp_path / "subs.srt"
+    font_path = tmp_path / "font.ttf"
+    output_path = tmp_path / "out.mp4"
+    video_path.write_bytes(b"video")
+    srt_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n", encoding="utf-8")
+    font_path.write_bytes(b"font")
+
+    def fake_render(**kwargs):
+        raise OSError("Unable to load font file: font.ttf")
+
+    monkeypatch.setattr("trendsubs.gui.window.render_subtitled_video", fake_render)
+
+    window = TrendSubsWindow()
+    window.font_combo.addItem(font_path.stem, str(font_path.resolve()))
+    window.font_combo.setCurrentIndex(window.font_combo.count() - 1)
+    window.video_input.setText(str(video_path))
+    window.srt_input.setText(str(srt_path))
+    window.output_input.setText(str(output_path))
+    window.output_dir_input.setText(str(tmp_path))
+    window.run_render()
+
+    assert "Render failed: Unable to load font file" in window.log_output.toPlainText()
+    app.quit()
+
+
 def test_trendsubs_window_run_render_accepts_wrapped_quotes(tmp_path, monkeypatch):
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     app = QApplication.instance() or QApplication([])

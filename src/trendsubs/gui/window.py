@@ -266,12 +266,16 @@ class TrendSubsWindow(QWidget):
         if options is None:
             return
 
-        render_subtitled_video(
-            video_path=video_path,
-            srt_path=srt_path,
-            output_path=output_path,
-            options=options,
-        )
+        try:
+            render_subtitled_video(
+                video_path=video_path,
+                srt_path=srt_path,
+                output_path=output_path,
+                options=options,
+            )
+        except Exception as error:
+            self.log_output.append(f"Render failed: {error}")
+            return
         self.log_output.append(f"Font: {Path(options.font_path).name}")
         self.log_output.append(f"Rendered video: {output_path}")
 
@@ -311,13 +315,17 @@ class TrendSubsWindow(QWidget):
             return
 
         preview_path = output_path.with_suffix(".preview.png")
-        render_preview_frame(
-            video_path=video_path,
-            srt_path=srt_path,
-            output_image_path=preview_path,
-            options=options,
-            at_seconds=preview_time,
-        )
+        try:
+            render_preview_frame(
+                video_path=video_path,
+                srt_path=srt_path,
+                output_image_path=preview_path,
+                options=options,
+                at_seconds=preview_time,
+            )
+        except Exception as error:
+            self.log_output.append(f"Preview failed: {error}")
+            return
         self.log_output.append(f"Font: {Path(options.font_path).name}")
         self.log_output.append(f"Preview saved: {preview_path}")
 

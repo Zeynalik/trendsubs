@@ -164,6 +164,10 @@ def test_render_subtitled_video_word_pill_uses_jump_overlay_renderer(tmp_path: P
     assert called["font_path"] == font_path
     assert called["play_res"] == (1920, 1080)
     assert called["max_words_per_line"] == 2
+    assert called["active_fill_color"] == (255, 216, 77, 235)
+    assert called["inactive_text_color"] == (255, 255, 255, 230)
+    assert called["outline_color"] == (16, 16, 16, 230)
+    assert called["outline_width"] == 3
     assert captured
     assert "-filter_complex" in captured[-1]
     assert "overlay=0:0:format=auto" in captured[-1][captured[-1].index("-filter_complex") + 1]
@@ -325,6 +329,7 @@ def test_render_preview_frame_word_pill_uses_jump_overlay_frame(tmp_path: Path, 
     assert called["at_ms"] == 1200
     assert called["play_res"] == (1920, 1080)
     assert called["max_words_per_line"] == 2
+    assert called["active_fill_color"] == (255, 216, 77, 235)
     assert captured and "-filter_complex" in captured[0]
     assert "overlay=0:0:format=auto" in captured[0][captured[0].index("-filter_complex") + 1]
     assert not preview_path.with_suffix(".word_jump.png").exists()

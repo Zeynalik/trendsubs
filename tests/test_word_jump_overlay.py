@@ -1,7 +1,7 @@
 from PIL import Image, ImageDraw, ImageFont
 
 from trendsubs.core.models import SubtitleCue, WordSlice
-from trendsubs.core.word_jump_overlay import _active_cue, _active_word_index, _jump_position, _layout_words
+from trendsubs.core.word_jump_overlay import _active_cue, _active_word_index, _jump_position, _layout_words, _load_font
 
 
 def test_active_word_index_follows_word_timings():
@@ -78,3 +78,15 @@ def test_layout_words_wraps_by_max_words_per_line():
     assert boxes[0][1][1] == boxes[1][1][1]
     assert boxes[2][1][1] > boxes[0][1][1]
     assert boxes[2][1][0] < boxes[1][1][0]
+
+
+def test_load_font_rejects_invalid_font_file(tmp_path):
+    font_path = tmp_path / "broken.ttf"
+    font_path.write_bytes(b"not a font")
+
+    try:
+        _load_font(font_path=font_path, font_size=32)
+    except OSError as error:
+        assert str(font_path) in str(error)
+    else:
+        raise AssertionError("invalid font file was silently accepted")

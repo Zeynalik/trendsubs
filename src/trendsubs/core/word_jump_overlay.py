@@ -14,6 +14,7 @@ from trendsubs.core.models import SubtitleCue, WordSlice
 FrameCenter = tuple[int, int]
 WordBox = tuple[WordSlice, tuple[int, int, int, int], tuple[int, int]]
 WordMeasurement = tuple[WordSlice, tuple[int, int, int, int], int, int]
+RgbaColor = tuple[int, int, int, int]
 
 
 def render_word_jump_overlay(
@@ -26,6 +27,11 @@ def render_word_jump_overlay(
     bottom_margin: int,
     safe_area_offset: int = 0,
     max_words_per_line: int = 0,
+    active_fill_color: RgbaColor = (0, 118, 255, 235),
+    active_text_color: RgbaColor = (255, 255, 255, 255),
+    inactive_text_color: RgbaColor = (255, 255, 255, 230),
+    outline_color: RgbaColor = (0, 0, 0, 210),
+    outline_width: int = 3,
     fps: int = 30,
     command_runner=None,
 ) -> Path:
@@ -48,6 +54,11 @@ def render_word_jump_overlay(
                 bottom_margin=bottom_margin,
                 safe_area_offset=safe_area_offset,
                 max_words_per_line=max_words_per_line,
+                active_fill_color=active_fill_color,
+                active_text_color=active_text_color,
+                inactive_text_color=inactive_text_color,
+                outline_color=outline_color,
+                outline_width=outline_width,
             )
             frame.save(frames_dir / f"{frame_index:06d}.png")
 
@@ -81,6 +92,11 @@ def render_word_jump_frame(
     bottom_margin: int,
     safe_area_offset: int = 0,
     max_words_per_line: int = 0,
+    active_fill_color: RgbaColor = (0, 118, 255, 235),
+    active_text_color: RgbaColor = (255, 255, 255, 255),
+    inactive_text_color: RgbaColor = (255, 255, 255, 230),
+    outline_color: RgbaColor = (0, 0, 0, 210),
+    outline_width: int = 3,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font = _load_font(font_path=font_path, font_size=font_size)
@@ -93,6 +109,11 @@ def render_word_jump_frame(
         bottom_margin=bottom_margin,
         safe_area_offset=safe_area_offset,
         max_words_per_line=max_words_per_line,
+        active_fill_color=active_fill_color,
+        active_text_color=active_text_color,
+        inactive_text_color=inactive_text_color,
+        outline_color=outline_color,
+        outline_width=outline_width,
     )
     frame.save(output_path)
     return output_path
@@ -138,8 +159,8 @@ def _resolve_ffmpeg_executable() -> str:
 def _load_font(*, font_path: Path, font_size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     try:
         return ImageFont.truetype(str(font_path), font_size)
-    except OSError:
-        return ImageFont.load_default()
+    except OSError as error:
+        raise OSError(f"Unable to load font file: {font_path}") from error
 
 
 def _active_cue(cues: list[SubtitleCue], at_ms: int) -> SubtitleCue | None:
@@ -159,6 +180,11 @@ def _build_word_jump_frame(
     bottom_margin: int,
     safe_area_offset: int,
     max_words_per_line: int,
+    active_fill_color: RgbaColor,
+    active_text_color: RgbaColor,
+    inactive_text_color: RgbaColor,
+    outline_color: RgbaColor,
+    outline_width: int,
 ) -> Image.Image:
     frame = Image.new("RGBA", play_res, (0, 0, 0, 0))
     draw = ImageDraw.Draw(frame)
@@ -174,6 +200,11 @@ def _build_word_jump_frame(
             bottom_margin=bottom_margin,
             safe_area_offset=safe_area_offset,
             max_words_per_line=max_words_per_line,
+            active_fill_color=active_fill_color,
+            active_text_color=active_text_color,
+            inactive_text_color=inactive_text_color,
+            outline_color=outline_color,
+            outline_width=outline_width,
         )
     return frame
 
@@ -189,6 +220,11 @@ def _draw_cue_frame(
     bottom_margin: int,
     safe_area_offset: int,
     max_words_per_line: int,
+    active_fill_color: RgbaColor,
+    active_text_color: RgbaColor,
+    inactive_text_color: RgbaColor,
+    outline_color: RgbaColor,
+    outline_width: int,
 ) -> None:
     word_boxes = _layout_words(
         draw=draw,
@@ -199,6 +235,7 @@ def _draw_cue_frame(
         bottom_margin=bottom_margin,
         safe_area_offset=safe_area_offset,
         max_words_per_line=max_words_per_line,
+        outline_width=outline_width,
     )
     if not word_boxes:
         return
@@ -206,9 +243,29 @@ def _draw_cue_frame(
     active_index = _active_word_index(cue, at_ms)
     for index, (word, box, origin) in enumerate(word_boxes):
         if index == active_index:
-            _draw_active_word(draw=draw, word=word.text, box=box, origin=origin, font=font, font_size=font_size)
+            _draw_active_word(
+                draw=draw,
+                word=word.text,
+                box=box,
+                origin=origin,
+                font=font,
+                font_size=font_size,
+                active_fill_color=active_fill_color,
+                active_text_color=active_text_color,
+                outline_color=outline_color,
+                outline_width=outline_width,
+            )
         else:
-            _draw_inactive_word(draw=draw, word=word.text, box=box, origin=origin, font=font, font_size=font_size)
+            _draw_inactive_word(
+                draw=draw,
+                word=word.text,
+                origin=origin,
+                font=font,
+                font_size=font_size,
+                inactive_text_color=inactive_text_color,
+                outline_color=outline_color,
+                outline_width=outline_width,
+            )
 
     previous_index = max(0, active_index - 1)
     current_word = word_boxes[active_index][0]
@@ -236,13 +293,14 @@ def _layout_words(
     bottom_margin: int,
     safe_area_offset: int,
     max_words_per_line: int = 0,
+    outline_width: int = 3,
 ) -> list[WordBox]:
     words = _display_words(cue)
     if not words:
         return []
 
     spacing = max(12, round(font_size * 0.28))
-    stroke_width = _text_stroke_width(font_size)
+    stroke_width = _text_stroke_width(font_size, outline_width)
     measurements: list[WordMeasurement] = []
     for word in words:
         bbox = draw.textbbox((0, 0), word.text, font=font, stroke_width=stroke_width)
@@ -336,6 +394,10 @@ def _draw_active_word(
     origin: tuple[int, int],
     font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
     font_size: int,
+    active_fill_color: RgbaColor,
+    active_text_color: RgbaColor,
+    outline_color: RgbaColor,
+    outline_width: int,
 ) -> None:
     pad_x = max(10, round(font_size * 0.28))
     pad_y = max(6, round(font_size * 0.18))
@@ -343,23 +405,43 @@ def _draw_active_word(
     draw.rounded_rectangle(
         pill,
         radius=max(10, round(font_size * 0.24)),
-        fill=(0, 118, 255, 235),
+        fill=active_fill_color,
         outline=(255, 255, 255, 215),
         width=max(2, round(font_size * 0.04)),
     )
-    _draw_word_text(draw=draw, word=word, origin=origin, font=font, font_size=font_size, fill=(255, 255, 255, 255))
+    _draw_word_text(
+        draw=draw,
+        word=word,
+        origin=origin,
+        font=font,
+        font_size=font_size,
+        fill=active_text_color,
+        outline_color=outline_color,
+        outline_width=outline_width,
+    )
 
 
 def _draw_inactive_word(
     *,
     draw: ImageDraw.ImageDraw,
     word: str,
-    box: tuple[int, int, int, int],
     origin: tuple[int, int],
     font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
     font_size: int,
+    inactive_text_color: RgbaColor,
+    outline_color: RgbaColor,
+    outline_width: int,
 ) -> None:
-    _draw_word_text(draw=draw, word=word, origin=origin, font=font, font_size=font_size, fill=(255, 255, 255, 230))
+    _draw_word_text(
+        draw=draw,
+        word=word,
+        origin=origin,
+        font=font,
+        font_size=font_size,
+        fill=inactive_text_color,
+        outline_color=outline_color,
+        outline_width=outline_width,
+    )
 
 
 def _draw_word_text(
@@ -370,19 +452,21 @@ def _draw_word_text(
     font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
     font_size: int,
     fill: tuple[int, int, int, int],
+    outline_color: RgbaColor,
+    outline_width: int,
 ) -> None:
     draw.text(
         origin,
         word,
         font=font,
         fill=fill,
-        stroke_width=_text_stroke_width(font_size),
-        stroke_fill=(0, 0, 0, 210),
+        stroke_width=_text_stroke_width(font_size, outline_width),
+        stroke_fill=outline_color,
     )
 
 
-def _text_stroke_width(font_size: int) -> int:
-    return max(2, round(font_size * 0.08))
+def _text_stroke_width(font_size: int, outline_width: int) -> int:
+    return max(1, round(outline_width * max(0.8, font_size / 48)))
 
 
 def _mascot_anchor(box: tuple[int, int, int, int]) -> FrameCenter:
