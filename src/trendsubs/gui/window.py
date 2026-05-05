@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from trendsubs.core.font_utils import resolve_ass_font_name
 from trendsubs.core.models import RenderOptions
 from trendsubs.core.presets import PRESETS
 from trendsubs.core.render_service import render_preview_frame, render_subtitled_video
@@ -114,7 +115,7 @@ class TrendSubsWindow(QWidget):
 
         self.font_combo = QComboBox()
         for font_path in discover_font_paths():
-            self.font_combo.addItem(Path(font_path).stem, font_path)
+            self.font_combo.addItem(_font_display_name(font_path), font_path)
         self.font_pick_button = QPushButton("Add Font...")
         self.font_pick_button.clicked.connect(self.pick_font)
         if self.font_combo.count() == 0:
@@ -235,7 +236,7 @@ class TrendSubsWindow(QWidget):
             normalized = str(Path(selected).resolve())
             existing_index = self.font_combo.findData(normalized)
             if existing_index < 0:
-                self.font_combo.addItem(Path(normalized).stem, normalized)
+                self.font_combo.addItem(_font_display_name(normalized), normalized)
                 existing_index = self.font_combo.count() - 1
             self.font_combo.setCurrentIndex(existing_index)
 
@@ -271,6 +272,7 @@ class TrendSubsWindow(QWidget):
             output_path=output_path,
             options=options,
         )
+        self.log_output.append(f"Font: {Path(options.font_path).name}")
         self.log_output.append(f"Rendered video: {output_path}")
 
     def run_preview(self) -> None:
@@ -316,6 +318,7 @@ class TrendSubsWindow(QWidget):
             options=options,
             at_seconds=preview_time,
         )
+        self.log_output.append(f"Font: {Path(options.font_path).name}")
         self.log_output.append(f"Preview saved: {preview_path}")
 
     def _build_render_options(self) -> RenderOptions | None:
@@ -393,7 +396,7 @@ class TrendSubsWindow(QWidget):
         if font_path:
             font_index = self.font_combo.findData(font_path)
             if font_index < 0 and Path(font_path).exists():
-                self.font_combo.addItem(Path(font_path).stem, font_path)
+                self.font_combo.addItem(_font_display_name(font_path), font_path)
                 font_index = self.font_combo.count() - 1
             if font_index >= 0:
                 self.font_combo.setCurrentIndex(font_index)
@@ -495,6 +498,14 @@ def _normalize_path_input(raw: str) -> str:
     if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
         return value[1:-1].strip()
     return value
+
+
+def _font_display_name(font_path: str) -> str:
+    path = Path(font_path)
+    family_name = resolve_ass_font_name(str(path))
+    if family_name and family_name != path.stem:
+        return f"{family_name} ({path.name})"
+    return path.name
 
 
 def _existing_parent_dir(raw: str) -> str:

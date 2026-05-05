@@ -3,7 +3,7 @@ import os
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from trendsubs.gui.window import TrendSubsWindow, build_color_names, build_preset_names
+from trendsubs.gui.window import TrendSubsWindow, _font_display_name, build_color_names, build_preset_names
 
 
 @pytest.fixture(autouse=True)
@@ -27,6 +27,12 @@ def test_build_preset_names_exposes_all_default_presets():
 
 def test_build_color_names_exposes_available_colors():
     assert build_color_names() == ["Yellow", "White", "Red"]
+
+
+def test_font_display_name_uses_font_family_for_real_font():
+    font_path = os.path.abspath("fonts/Caveat-VariableFont_wght.ttf")
+
+    assert _font_display_name(font_path) == "Caveat (Caveat-VariableFont_wght.ttf)"
 
 
 def test_trendsubs_window_builds_expected_form_fields():
@@ -198,6 +204,7 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     assert called["options"].max_words_per_caption == 8
     assert called["options"].safe_area_offset == 15
     assert called["options"].auto_font_scale is False
+    assert "Font: font.ttf" in window.log_output.toPlainText()
     assert "Rendered video" in window.log_output.toPlainText()
     app.quit()
 
