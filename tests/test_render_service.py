@@ -155,6 +155,7 @@ def test_render_subtitled_video_word_pill_uses_jump_overlay_renderer(tmp_path: P
             bottom_margin=120,
             keep_ass=False,
             mode="word-pill",
+            max_words_per_line=2,
         ),
         command_runner=fake_runner,
     )
@@ -162,9 +163,53 @@ def test_render_subtitled_video_word_pill_uses_jump_overlay_renderer(tmp_path: P
     assert result.ass_path is None
     assert called["font_path"] == font_path
     assert called["play_res"] == (1920, 1080)
+    assert called["max_words_per_line"] == 2
     assert captured
     assert "-filter_complex" in captured[-1]
     assert "overlay=0:0:format=auto" in captured[-1][captured[-1].index("-filter_complex") + 1]
+
+
+def test_render_subtitled_video_word_pill_applies_auto_font_scale(tmp_path: Path, monkeypatch):
+    srt_path = tmp_path / "input.srt"
+    video_path = tmp_path / "input.mp4"
+    font_path = tmp_path / "font.ttf"
+    output_path = tmp_path / "output.mp4"
+
+    srt_path.write_text(
+        "1\n00:00:01,000 --> 00:00:02,500\n"
+        "This is a very long subtitle line that should scale down for word pill rendering\n",
+        encoding="utf-8",
+    )
+    video_path.write_bytes(b"video")
+    font_path.write_bytes(b"font")
+    called = {}
+
+    def fake_overlay_renderer(**kwargs) -> Path:
+        called.update(kwargs)
+        overlay_path = kwargs["output_path"]
+        overlay_path.write_bytes(b"overlay")
+        return overlay_path
+
+    monkeypatch.setattr("trendsubs.core.render_service.render_word_jump_overlay", fake_overlay_renderer)
+
+    render_subtitled_video(
+        video_path=video_path,
+        srt_path=srt_path,
+        output_path=output_path,
+        options=RenderOptions(
+            preset="social-pop",
+            font_path=str(font_path),
+            accent_color="#FFD84D",
+            font_size=100,
+            bottom_margin=120,
+            keep_ass=False,
+            mode="word-pill",
+            auto_font_scale=True,
+        ),
+        command_runner=lambda command: None,
+    )
+
+    assert called["font_size"] == 62
 
 
 def test_apply_caption_word_limit_balances_chunks_without_one_word_tail():
@@ -271,6 +316,7 @@ def test_render_preview_frame_word_pill_uses_jump_overlay_frame(tmp_path: Path, 
             bottom_margin=120,
             keep_ass=False,
             mode="word-pill",
+            max_words_per_line=2,
         ),
         command_runner=fake_runner,
     )
@@ -278,6 +324,7 @@ def test_render_preview_frame_word_pill_uses_jump_overlay_frame(tmp_path: Path, 
     assert out == preview_path
     assert called["at_ms"] == 1200
     assert called["play_res"] == (1920, 1080)
+    assert called["max_words_per_line"] == 2
     assert captured and "-filter_complex" in captured[0]
     assert "overlay=0:0:format=auto" in captured[0][captured[0].index("-filter_complex") + 1]
     assert not preview_path.with_suffix(".word_jump.png").exists()

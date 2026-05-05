@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 
-from trendsubs.core.ass_builder import build_ass_document
+from trendsubs.core.ass_builder import build_ass_document, resolve_effective_font_size
 from trendsubs.core.ffmpeg_runner import (
     build_ffmpeg_command,
     build_overlay_command,
@@ -42,15 +42,22 @@ def render_subtitled_video(
     if options.mode == "word-pill":
         runner = command_runner or _run_command
         overlay_path = output_path.with_suffix(".word_jump.mov")
+        effective_font_size = resolve_effective_font_size(
+            requested_size=options.font_size,
+            play_res_y=play_res[1],
+            cues=cues,
+            auto_font_scale=options.auto_font_scale,
+        )
         try:
             render_word_jump_overlay(
                 cues=cues,
                 output_path=overlay_path,
                 play_res=play_res,
                 font_path=Path(options.font_path),
-                font_size=options.font_size,
+                font_size=effective_font_size,
                 bottom_margin=options.bottom_margin,
                 safe_area_offset=options.safe_area_offset,
+                max_words_per_line=options.max_words_per_line,
                 command_runner=runner,
             )
             command = build_overlay_command(
@@ -109,6 +116,12 @@ def render_preview_frame(
     if options.mode == "word-pill":
         overlay_image_path = output_image_path.with_suffix(".word_jump.png")
         runner = command_runner or _run_command
+        effective_font_size = resolve_effective_font_size(
+            requested_size=options.font_size,
+            play_res_y=play_res[1],
+            cues=cues,
+            auto_font_scale=options.auto_font_scale,
+        )
         try:
             render_word_jump_frame(
                 cues=cues,
@@ -116,9 +129,10 @@ def render_preview_frame(
                 at_ms=round(preview_seconds * 1000),
                 play_res=play_res,
                 font_path=Path(options.font_path),
-                font_size=options.font_size,
+                font_size=effective_font_size,
                 bottom_margin=options.bottom_margin,
                 safe_area_offset=options.safe_area_offset,
+                max_words_per_line=options.max_words_per_line,
             )
             command = build_overlay_preview_command(
                 video_path=video_path,

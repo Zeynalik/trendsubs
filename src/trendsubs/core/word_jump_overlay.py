@@ -12,7 +12,8 @@ from trendsubs.core.models import SubtitleCue, WordSlice
 
 
 FrameCenter = tuple[int, int]
-WordBox = tuple[WordSlice, tuple[int, int, int, int]]
+WordBox = tuple[WordSlice, tuple[int, int, int, int], tuple[int, int]]
+WordMeasurement = tuple[WordSlice, tuple[int, int, int, int], int, int]
 
 
 def render_word_jump_overlay(
@@ -24,6 +25,7 @@ def render_word_jump_overlay(
     font_size: int,
     bottom_margin: int,
     safe_area_offset: int = 0,
+    max_words_per_line: int = 0,
     fps: int = 30,
     command_runner=None,
 ) -> Path:
@@ -45,6 +47,7 @@ def render_word_jump_overlay(
                 font_size=font_size,
                 bottom_margin=bottom_margin,
                 safe_area_offset=safe_area_offset,
+                max_words_per_line=max_words_per_line,
             )
             frame.save(frames_dir / f"{frame_index:06d}.png")
 
@@ -77,6 +80,7 @@ def render_word_jump_frame(
     font_size: int,
     bottom_margin: int,
     safe_area_offset: int = 0,
+    max_words_per_line: int = 0,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font = _load_font(font_path=font_path, font_size=font_size)
@@ -88,6 +92,7 @@ def render_word_jump_frame(
         font_size=font_size,
         bottom_margin=bottom_margin,
         safe_area_offset=safe_area_offset,
+        max_words_per_line=max_words_per_line,
     )
     frame.save(output_path)
     return output_path
@@ -139,7 +144,7 @@ def _load_font(*, font_path: Path, font_size: int) -> ImageFont.FreeTypeFont | I
 
 def _active_cue(cues: list[SubtitleCue], at_ms: int) -> SubtitleCue | None:
     for cue in cues:
-        if cue.start_ms <= at_ms <= cue.end_ms:
+        if cue.start_ms <= at_ms < cue.end_ms:
             return cue
     return None
 
@@ -153,6 +158,7 @@ def _build_word_jump_frame(
     font_size: int,
     bottom_margin: int,
     safe_area_offset: int,
+    max_words_per_line: int,
 ) -> Image.Image:
     frame = Image.new("RGBA", play_res, (0, 0, 0, 0))
     draw = ImageDraw.Draw(frame)
@@ -167,6 +173,7 @@ def _build_word_jump_frame(
             font_size=font_size,
             bottom_margin=bottom_margin,
             safe_area_offset=safe_area_offset,
+            max_words_per_line=max_words_per_line,
         )
     return frame
 
@@ -181,6 +188,7 @@ def _draw_cue_frame(
     font_size: int,
     bottom_margin: int,
     safe_area_offset: int,
+    max_words_per_line: int,
 ) -> None:
     word_boxes = _layout_words(
         draw=draw,
@@ -190,16 +198,17 @@ def _draw_cue_frame(
         font_size=font_size,
         bottom_margin=bottom_margin,
         safe_area_offset=safe_area_offset,
+        max_words_per_line=max_words_per_line,
     )
     if not word_boxes:
         return
 
     active_index = _active_word_index(cue, at_ms)
-    for index, (word, box) in enumerate(word_boxes):
+    for index, (word, box, origin) in enumerate(word_boxes):
         if index == active_index:
-            _draw_active_word(draw=draw, word=word.text, box=box, font=font)
+            _draw_active_word(draw=draw, word=word.text, box=box, origin=origin, font=font, font_size=font_size)
         else:
-            _draw_inactive_word(draw=draw, word=word.text, box=box, font=font)
+            _draw_inactive_word(draw=draw, word=word.text, box=box, origin=origin, font=font, font_size=font_size)
 
     previous_index = max(0, active_index - 1)
     current_word = word_boxes[active_index][0]
@@ -226,34 +235,80 @@ def _layout_words(
     font_size: int,
     bottom_margin: int,
     safe_area_offset: int,
+    max_words_per_line: int = 0,
 ) -> list[WordBox]:
     words = _display_words(cue)
     if not words:
         return []
 
     spacing = max(12, round(font_size * 0.28))
-    measurements: list[tuple[WordSlice, int, int]] = []
-    total_width = 0
+    stroke_width = _text_stroke_width(font_size)
+    measurements: list[WordMeasurement] = []
     for word in words:
-        bbox = draw.textbbox((0, 0), word.text, font=font, stroke_width=max(1, font_size // 18))
+        bbox = draw.textbbox((0, 0), word.text, font=font, stroke_width=stroke_width)
         word_width = bbox[2] - bbox[0]
         word_height = bbox[3] - bbox[1]
-        measurements.append((word, word_width, word_height))
-        total_width += word_width
-    total_width += spacing * max(0, len(words) - 1)
-
+        measurements.append((word, bbox, word_width, word_height))
     max_width = round(play_res[0] * 0.88)
-    if total_width > max_width:
-        spacing = max(6, round(spacing * max_width / total_width))
+    rows = _wrap_measurements(
+        measurements=measurements,
+        spacing=spacing,
+        max_width=max_width,
+        max_words_per_line=max_words_per_line,
+    )
 
-    x = max(24, round((play_res[0] - min(total_width, max_width)) / 2))
     baseline_y = play_res[1] - bottom_margin - safe_area_offset
-    text_top = baseline_y - max(height for _, _, height in measurements)
+    line_gap = max(8, round(font_size * 0.18))
+    total_height = sum(max(height for _, _, _, height in row) for row in rows)
+    total_height += line_gap * max(0, len(rows) - 1)
+    text_top = max(8, baseline_y - total_height)
+
     boxes: list[WordBox] = []
-    for word, word_width, word_height in measurements:
-        boxes.append((word, (x, text_top, x + word_width, text_top + word_height)))
-        x += word_width + spacing
+    y = text_top
+    for row in rows:
+        row_width = _row_width(row=row, spacing=spacing)
+        row_height = max(height for _, _, _, height in row)
+        x = max(24, round((play_res[0] - row_width) / 2))
+        for word, bbox, word_width, word_height in row:
+            visual_box = (x, y, x + word_width, y + word_height)
+            origin = (x - bbox[0], y - bbox[1])
+            boxes.append((word, visual_box, origin))
+            x += word_width + spacing
+        y += row_height + line_gap
     return boxes
+
+
+def _wrap_measurements(
+    *,
+    measurements: list[WordMeasurement],
+    spacing: int,
+    max_width: int,
+    max_words_per_line: int,
+) -> list[list[WordMeasurement]]:
+    rows: list[list[WordMeasurement]] = []
+    current: list[WordMeasurement] = []
+    current_width = 0
+
+    for measurement in measurements:
+        word_width = measurement[2]
+        next_width = word_width if not current else current_width + spacing + word_width
+        explicit_break = max_words_per_line > 0 and len(current) >= max_words_per_line
+        width_break = bool(current) and next_width > max_width
+        if explicit_break or width_break:
+            rows.append(current)
+            current = []
+            current_width = 0
+
+        current.append(measurement)
+        current_width = word_width if current_width == 0 else current_width + spacing + word_width
+
+    if current:
+        rows.append(current)
+    return rows
+
+
+def _row_width(*, row: list[WordMeasurement], spacing: int) -> int:
+    return sum(measurement[2] for measurement in row) + spacing * max(0, len(row) - 1)
 
 
 def _display_words(cue: SubtitleCue) -> list[WordSlice]:
@@ -278,13 +333,21 @@ def _draw_active_word(
     draw: ImageDraw.ImageDraw,
     word: str,
     box: tuple[int, int, int, int],
+    origin: tuple[int, int],
     font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    font_size: int,
 ) -> None:
-    pad_x = 18
-    pad_y = 10
+    pad_x = max(10, round(font_size * 0.28))
+    pad_y = max(6, round(font_size * 0.18))
     pill = (box[0] - pad_x, box[1] - pad_y, box[2] + pad_x, box[3] + pad_y)
-    draw.rounded_rectangle(pill, radius=18, fill=(0, 118, 255, 235), outline=(255, 255, 255, 215), width=3)
-    _draw_word_text(draw=draw, word=word, box=box, font=font, fill=(255, 255, 255, 255))
+    draw.rounded_rectangle(
+        pill,
+        radius=max(10, round(font_size * 0.24)),
+        fill=(0, 118, 255, 235),
+        outline=(255, 255, 255, 215),
+        width=max(2, round(font_size * 0.04)),
+    )
+    _draw_word_text(draw=draw, word=word, origin=origin, font=font, font_size=font_size, fill=(255, 255, 255, 255))
 
 
 def _draw_inactive_word(
@@ -292,28 +355,34 @@ def _draw_inactive_word(
     draw: ImageDraw.ImageDraw,
     word: str,
     box: tuple[int, int, int, int],
+    origin: tuple[int, int],
     font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    font_size: int,
 ) -> None:
-    _draw_word_text(draw=draw, word=word, box=box, font=font, fill=(255, 255, 255, 230))
+    _draw_word_text(draw=draw, word=word, origin=origin, font=font, font_size=font_size, fill=(255, 255, 255, 230))
 
 
 def _draw_word_text(
     *,
     draw: ImageDraw.ImageDraw,
     word: str,
-    box: tuple[int, int, int, int],
+    origin: tuple[int, int],
     font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+    font_size: int,
     fill: tuple[int, int, int, int],
 ) -> None:
-    stroke_width = max(2, (box[3] - box[1]) // 12)
     draw.text(
-        (box[0], box[1]),
+        origin,
         word,
         font=font,
         fill=fill,
-        stroke_width=stroke_width,
+        stroke_width=_text_stroke_width(font_size),
         stroke_fill=(0, 0, 0, 210),
     )
+
+
+def _text_stroke_width(font_size: int) -> int:
+    return max(2, round(font_size * 0.08))
 
 
 def _mascot_anchor(box: tuple[int, int, int, int]) -> FrameCenter:

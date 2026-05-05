@@ -25,7 +25,7 @@ def build_ass_document(
         primary_color = accent_color
         secondary_color = accent_color
     play_res_x, play_res_y = play_res
-    effective_font_size = _resolve_effective_font_size(
+    effective_font_size = resolve_effective_font_size(
         requested_size=options.font_size,
         play_res_y=play_res_y,
         cues=cues,
@@ -462,7 +462,7 @@ def _hex_to_ass_bgr(color: str) -> str:
     return f"&H00{blue}{green}{red}".upper()
 
 
-def _resolve_effective_font_size(
+def resolve_effective_font_size(
     requested_size: int,
     play_res_y: int,
     cues: list[SubtitleCue],
@@ -486,3 +486,6 @@ def _resolve_effective_font_size(
 
     resolution_factor = min(1.0, max(0.65, play_res_y / 1080))
     return max(24, round(requested_size * length_factor * resolution_factor))
+
+
+_resolve_effective_font_size = resolve_effective_font_size
