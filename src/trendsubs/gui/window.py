@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 
 from PySide6.QtGui import QCloseEvent
@@ -133,15 +132,13 @@ class TrendSubsWindow(QWidget):
         self.preview_time_input = QLineEdit("10")
         self.auto_scale_check = QCheckBox("Auto scale font")
         self.auto_scale_check.setChecked(True)
-        self.memes_enabled_check = QCheckBox("Memes (Tenor)")
-        self.memes_enabled_check.setChecked(False)
 
         self.preset_combo = QComboBox()
         self.preset_combo.addItems(build_preset_names())
         self.mode_combo = QComboBox()
-        self.mode_combo.addItems(["highlight", "reveal", "word"])
+        self.mode_combo.addItems(["highlight", "reveal", "word", "word-pill"])
         self.animation_combo = QComboBox()
-        self.animation_combo.addItems(["none", "float", "pop-bounce", "pop-float"])
+        self.animation_combo.addItems(["none", "fade", "fade-words", "float", "pop-bounce", "pop-float"])
 
         self.render_button = QPushButton("Render")
         self.render_button.clicked.connect(self.run_render)
@@ -168,7 +165,6 @@ class TrendSubsWindow(QWidget):
         form.addRow("Max Words/Caption (0=off)", self.max_caption_words_input)
         form.addRow("Preview Time (sec)", self.preview_time_input)
         form.addRow("Auto Scale", self.auto_scale_check)
-        form.addRow("Memes", self.memes_enabled_check)
 
         layout = QVBoxLayout()
         layout.addLayout(form)
@@ -275,8 +271,6 @@ class TrendSubsWindow(QWidget):
             output_path=output_path,
             options=options,
         )
-        if options.memes_enabled and not options.tenor_api_key:
-            self.log_output.append("TENOR_API_KEY not set. Rendered without memes.")
         self.log_output.append(f"Rendered video: {output_path}")
 
     def run_preview(self) -> None:
@@ -353,9 +347,6 @@ class TrendSubsWindow(QWidget):
             max_words_per_caption=max(0, max_caption_words),
             safe_area_offset=max(0, safe_area_offset),
             auto_font_scale=self.auto_scale_check.isChecked(),
-            memes_enabled=self.memes_enabled_check.isChecked(),
-            max_memes=2,
-            tenor_api_key=os.getenv("TENOR_API_KEY", "").strip(),
         )
 
     def _selected_font_text(self) -> str:
@@ -378,7 +369,6 @@ class TrendSubsWindow(QWidget):
             "max_caption_words": self.max_caption_words_input.text(),
             "preview_time": self.preview_time_input.text(),
             "auto_scale": self.auto_scale_check.isChecked(),
-            "memes_enabled": self.memes_enabled_check.isChecked(),
         }
         settings_file = _settings_file_path()
         settings_file.parent.mkdir(parents=True, exist_ok=True)
@@ -428,7 +418,6 @@ class TrendSubsWindow(QWidget):
         )
         self.preview_time_input.setText(str(state.get("preview_time", self.preview_time_input.text()) or self.preview_time_input.text()))
         self.auto_scale_check.setChecked(bool(state.get("auto_scale", True)))
-        self.memes_enabled_check.setChecked(bool(state.get("memes_enabled", False)))
 
     def _sync_output_path_from_video(self) -> None:
         video_raw = _normalize_path_input(self.video_input.text())

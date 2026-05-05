@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import os
 from pathlib import Path
 import subprocess
-import tempfile
 
 from trendsubs.core.ass_builder import build_ass_document
-from trendsubs.core.ffmpeg_runner import build_ffmpeg_command, build_preview_command
-from trendsubs.core.models import MemeOverlay, RenderOptions, SubtitleCue
+from trendsubs.core.ffmpeg_runner import (
+    build_ffmpeg_command,
+    build_overlay_command,
+    build_overlay_preview_command,
+    build_preview_command,
+)
+from trendsubs.core.models import RenderOptions, SubtitleCue
 from trendsubs.core.srt_parser import parse_srt_text
-from trendsubs.core.tenor_memes import resolve_tenor_memes
 from trendsubs.core.word_timing import split_cue_into_word_slices
+from trendsubs.core.word_jump_overlay import render_word_jump_frame, render_word_jump_overlay
 
 
 @dataclass(slots=True)
@@ -36,39 +39,42 @@ def render_subtitled_video(
     cues = _apply_caption_word_limit(cues, max_words_per_caption=options.max_words_per_caption)
 
     play_res = _probe_video_resolution(video_path)
+    if options.mode == "word-pill":
+        runner = command_runner or _run_command
+        overlay_path = output_path.with_suffix(".word_jump.mov")
+        try:
+            render_word_jump_overlay(
+                cues=cues,
+                output_path=overlay_path,
+                play_res=play_res,
+                font_path=Path(options.font_path),
+                font_size=options.font_size,
+                bottom_margin=options.bottom_margin,
+                safe_area_offset=options.safe_area_offset,
+                command_runner=runner,
+            )
+            command = build_overlay_command(
+                video_path=video_path,
+                overlay_path=overlay_path,
+                output_path=output_path,
+            )
+            runner(command)
+        finally:
+            overlay_path.unlink(missing_ok=True)
+        return RenderResult(ass_path=None)
+
     ass_text = build_ass_document(cues, options, play_res=play_res)
     ass_path = output_path.with_suffix(".ass")
     ass_path.write_text(ass_text, encoding="utf-8")
 
     runner = command_runner or _run_command
-    meme_overlays: list[MemeOverlay] = []
-    temp_dir: tempfile.TemporaryDirectory[str] | None = None
-    try:
-        if options.memes_enabled:
-            api_key = options.tenor_api_key.strip() or os.getenv("TENOR_API_KEY", "").strip()
-            if api_key:
-                temp_dir = tempfile.TemporaryDirectory(prefix="trendsubs_memes_")
-                try:
-                    meme_overlays = resolve_tenor_memes(
-                        cues=cues,
-                        output_dir=Path(temp_dir.name),
-                        api_key=api_key,
-                        max_memes=max(0, options.max_memes),
-                    )
-                except Exception:
-                    meme_overlays = []
-
-        command = build_ffmpeg_command(
-            video_path=video_path,
-            ass_path=ass_path,
-            output_path=output_path,
-            font_path=Path(options.font_path),
-            meme_overlays=meme_overlays,
-        )
-        runner(command)
-    finally:
-        if temp_dir is not None:
-            temp_dir.cleanup()
+    command = build_ffmpeg_command(
+        video_path=video_path,
+        ass_path=ass_path,
+        output_path=output_path,
+        font_path=Path(options.font_path),
+    )
+    runner(command)
 
     if not options.keep_ass:
         ass_path.unlink(missing_ok=True)
@@ -100,6 +106,31 @@ def render_preview_frame(
     preview_seconds = _resolve_preview_seconds(cues, requested_seconds=at_seconds)
 
     play_res = _probe_video_resolution(video_path)
+    if options.mode == "word-pill":
+        overlay_image_path = output_image_path.with_suffix(".word_jump.png")
+        runner = command_runner or _run_command
+        try:
+            render_word_jump_frame(
+                cues=cues,
+                output_path=overlay_image_path,
+                at_ms=round(preview_seconds * 1000),
+                play_res=play_res,
+                font_path=Path(options.font_path),
+                font_size=options.font_size,
+                bottom_margin=options.bottom_margin,
+                safe_area_offset=options.safe_area_offset,
+            )
+            command = build_overlay_preview_command(
+                video_path=video_path,
+                overlay_image_path=overlay_image_path,
+                output_image_path=output_image_path,
+                at_seconds=preview_seconds,
+            )
+            runner(command)
+        finally:
+            overlay_image_path.unlink(missing_ok=True)
+        return output_image_path
+
     ass_text = build_ass_document(cues, options, play_res=play_res)
     ass_path = output_image_path.with_suffix(".preview.ass")
     ass_path.write_text(ass_text, encoding="utf-8")

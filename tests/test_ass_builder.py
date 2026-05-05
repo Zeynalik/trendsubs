@@ -350,6 +350,64 @@ def test_build_ass_document_float_animation_adds_soft_transform_tags():
     assert r"\t(280,540,\fscx100\fscy100)" in ass_text
 
 
+def test_build_ass_document_fade_animation_adds_slow_fade_tags():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=1000,
+        end_ms=3000,
+        text="hello world",
+        lines=["hello world"],
+    )
+    cue.word_slices = [
+        WordSlice(text="hello", start_ms=1000, end_ms=2000, is_punctuation=False),
+        WordSlice(text="world", start_ms=2000, end_ms=3000, is_punctuation=False),
+    ]
+    options = RenderOptions(
+        preset="social-pop",
+        font_path="C:\\Fonts\\MyFont.ttf",
+        accent_color="#FFD84D",
+        font_size=40,
+        bottom_margin=120,
+        keep_ass=False,
+        mode="highlight",
+        animation="fade",
+    )
+
+    ass_text = build_ass_document([cue], options, play_res=(1920, 1080))
+
+    assert r"\fad(220,520)" in ass_text
+
+
+def test_build_ass_document_fade_words_animation_fades_words_sequentially():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=1000,
+        end_ms=3000,
+        text="hello world",
+        lines=["hello world"],
+    )
+    cue.word_slices = [
+        WordSlice(text="hello", start_ms=1000, end_ms=2000, is_punctuation=False),
+        WordSlice(text="world", start_ms=2000, end_ms=3000, is_punctuation=False),
+    ]
+    options = RenderOptions(
+        preset="social-pop",
+        font_path="C:\\Fonts\\MyFont.ttf",
+        accent_color="#FFD84D",
+        font_size=40,
+        bottom_margin=120,
+        keep_ass=False,
+        mode="highlight",
+        animation="fade-words",
+    )
+
+    ass_text = build_ass_document([cue], options, play_res=(1920, 1080))
+
+    assert r"\t(1000,1420,\alpha&HFF&)" in ass_text
+    assert r"\t(1580,2000,\alpha&HFF&)" in ass_text
+    assert ass_text.index("hello") < ass_text.index("world")
+
+
 def test_build_ass_document_pop_float_animation_combines_both_effects():
     cue = SubtitleCue(
         index=1,
@@ -413,6 +471,39 @@ def test_build_ass_document_word_mode_emits_one_dialogue_per_word():
     assert dialogue_lines[1].endswith("two")
     assert dialogue_lines[2].endswith("three")
     assert r"\alpha&H80&" in ass_text
+
+
+def test_build_ass_document_word_pill_mode_highlights_each_word_with_mascot():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=1000,
+        end_ms=3000,
+        text="one two",
+        lines=["one two"],
+    )
+    cue.word_slices = [
+        WordSlice(text="one", start_ms=1000, end_ms=2000, is_punctuation=False),
+        WordSlice(text="two", start_ms=2000, end_ms=3000, is_punctuation=False),
+    ]
+    options = RenderOptions(
+        preset="social-pop",
+        font_path="C:\\Fonts\\MyFont.ttf",
+        accent_color="#FFD84D",
+        font_size=40,
+        bottom_margin=120,
+        keep_ass=False,
+        mode="word-pill",
+    )
+
+    ass_text = build_ass_document([cue], options, play_res=(1920, 1080))
+    dialogue_lines = [line for line in ass_text.splitlines() if line.startswith("Dialogue:")]
+
+    assert len(dialogue_lines) == 6
+    assert r"\3c&HFF7A00&" in ass_text
+    assert r"\bord18" in ass_text
+    assert r"\p1" in ass_text
+    assert dialogue_lines[2].endswith("one{\\r}")
+    assert dialogue_lines[5].endswith("two{\\r}")
 
 
 def test_build_ass_document_word_mode_removes_commas_and_keeps_words_separate():

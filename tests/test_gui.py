@@ -41,11 +41,10 @@ def test_trendsubs_window_builds_expected_form_fields():
     assert window.output_name_input.placeholderText() == "Output file name (without .mp4)"
     assert window.preset_combo.count() == 6
     assert window.color_combo.count() == 4
-    assert window.mode_combo.count() == 3
-    assert window.animation_combo.count() == 4
+    assert window.mode_combo.count() == 4
+    assert window.animation_combo.count() == 6
     assert window.font_combo.count() >= 1
     assert window.auto_scale_check.isChecked() is True
-    assert window.memes_enabled_check.isChecked() is False
     assert window.render_button.text() == "Render"
     assert window.preview_button.text() == "Preview Frame"
     assert window.size_input.text() == "40"
@@ -199,46 +198,7 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     assert called["options"].max_words_per_caption == 8
     assert called["options"].safe_area_offset == 15
     assert called["options"].auto_font_scale is False
-    assert called["options"].memes_enabled is False
     assert "Rendered video" in window.log_output.toPlainText()
-    app.quit()
-
-
-def test_trendsubs_window_run_render_can_enable_tenor_memes(tmp_path, monkeypatch):
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    app = QApplication.instance() or QApplication([])
-
-    video_path = tmp_path / "video.mp4"
-    srt_path = tmp_path / "subs.srt"
-    font_path = tmp_path / "font.ttf"
-    output_path = tmp_path / "out.mp4"
-    video_path.write_bytes(b"video")
-    srt_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n", encoding="utf-8")
-    font_path.write_bytes(b"font")
-
-    called = {}
-
-    def fake_render(**kwargs):
-        called.update(kwargs)
-        return None
-
-    monkeypatch.setattr("trendsubs.gui.window.render_subtitled_video", fake_render)
-
-    window = TrendSubsWindow()
-    font_index = window.font_combo.findData(str(font_path.resolve()))
-    if font_index < 0:
-        window.font_combo.addItem(font_path.stem, str(font_path.resolve()))
-        font_index = window.font_combo.count() - 1
-
-    window.video_input.setText(str(video_path))
-    window.srt_input.setText(str(srt_path))
-    window.output_input.setText(str(output_path))
-    window.output_dir_input.setText(str(tmp_path))
-    window.font_combo.setCurrentIndex(font_index)
-    window.memes_enabled_check.setChecked(True)
-    window.run_render()
-
-    assert called["options"].memes_enabled is True
     app.quit()
 
 

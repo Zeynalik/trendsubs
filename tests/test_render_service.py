@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from trendsubs.core.models import MemeOverlay, RenderOptions, SubtitleCue, WordSlice
+from trendsubs.core.models import RenderOptions, SubtitleCue, WordSlice
 from trendsubs.core.render_service import _apply_caption_word_limit, render_preview_frame, render_subtitled_video
 
 
@@ -116,34 +116,34 @@ def test_render_subtitled_video_splits_long_cue_by_max_words_per_caption(tmp_pat
     assert len(dialogue_lines) == 3
 
 
-def test_render_subtitled_video_resolves_tenor_memes_only_when_enabled(tmp_path: Path, monkeypatch):
+def test_render_subtitled_video_word_pill_uses_jump_overlay_renderer(tmp_path: Path, monkeypatch):
     srt_path = tmp_path / "input.srt"
     video_path = tmp_path / "input.mp4"
     font_path = tmp_path / "font.ttf"
     output_path = tmp_path / "output.mp4"
 
     srt_path.write_text(
-        "1\n00:00:01,000 --> 00:00:02,500\nwow what a goal\n",
+        "1\n00:00:01,000 --> 00:00:02,500\nHello brave world\n",
         encoding="utf-8",
     )
     video_path.write_bytes(b"video")
     font_path.write_bytes(b"font")
 
     captured: list[list[str]] = []
-    calls = {"resolver": 0}
+    called = {}
 
     def fake_runner(command: list[str]) -> None:
         captured.append(command)
 
-    def fake_resolver(**_kwargs):
-        calls["resolver"] += 1
-        return [MemeOverlay(gif_path=tmp_path / "meme.gif", start_ms=1000, end_ms=2300)]
+    def fake_overlay_renderer(**kwargs) -> Path:
+        called.update(kwargs)
+        overlay_path = kwargs["output_path"]
+        overlay_path.write_bytes(b"overlay")
+        return overlay_path
 
-    monkeypatch.setattr("trendsubs.core.render_service.resolve_tenor_memes", fake_resolver)
-    monkeypatch.setenv("TENOR_API_KEY", "fake-key")
-    (tmp_path / "meme.gif").write_bytes(b"gif")
+    monkeypatch.setattr("trendsubs.core.render_service.render_word_jump_overlay", fake_overlay_renderer)
 
-    render_subtitled_video(
+    result = render_subtitled_video(
         video_path=video_path,
         srt_path=srt_path,
         output_path=output_path,
@@ -154,14 +154,17 @@ def test_render_subtitled_video_resolves_tenor_memes_only_when_enabled(tmp_path:
             font_size=64,
             bottom_margin=120,
             keep_ass=False,
-            memes_enabled=True,
+            mode="word-pill",
         ),
         command_runner=fake_runner,
     )
 
-    assert calls["resolver"] == 1
+    assert result.ass_path is None
+    assert called["font_path"] == font_path
+    assert called["play_res"] == (1920, 1080)
     assert captured
-    assert "-filter_complex" in captured[0]
+    assert "-filter_complex" in captured[-1]
+    assert "overlay=0:0:format=auto" in captured[-1][captured[-1].index("-filter_complex") + 1]
 
 
 def test_apply_caption_word_limit_balances_chunks_without_one_word_tail():
@@ -226,6 +229,58 @@ def test_render_preview_frame_runs_ffmpeg_preview_and_cleans_ass(tmp_path: Path)
     assert preview_path.exists()
     assert captured and "-frames:v" in captured[0]
     assert captured[0][captured[0].index("-ss") + 1] == "1.200"
+    assert not preview_path.with_suffix(".preview.ass").exists()
+
+
+def test_render_preview_frame_word_pill_uses_jump_overlay_frame(tmp_path: Path, monkeypatch):
+    srt_path = tmp_path / "input.srt"
+    video_path = tmp_path / "input.mp4"
+    font_path = tmp_path / "font.ttf"
+    preview_path = tmp_path / "preview.png"
+    srt_path.write_text(
+        "1\n00:00:01,000 --> 00:00:02,500\nHello brave world\n",
+        encoding="utf-8",
+    )
+    video_path.write_bytes(b"video")
+    font_path.write_bytes(b"font")
+    captured: list[list[str]] = []
+    called = {}
+
+    def fake_runner(command: list[str]) -> None:
+        captured.append(command)
+        preview_path.write_bytes(b"png")
+
+    def fake_overlay_frame(**kwargs) -> Path:
+        called.update(kwargs)
+        overlay_path = kwargs["output_path"]
+        overlay_path.write_bytes(b"overlay png")
+        return overlay_path
+
+    monkeypatch.setattr("trendsubs.core.render_service.render_word_jump_frame", fake_overlay_frame)
+
+    out = render_preview_frame(
+        video_path=video_path,
+        srt_path=srt_path,
+        output_image_path=preview_path,
+        at_seconds=1.2,
+        options=RenderOptions(
+            preset="social-pop",
+            font_path=str(font_path),
+            accent_color="#FFD84D",
+            font_size=40,
+            bottom_margin=120,
+            keep_ass=False,
+            mode="word-pill",
+        ),
+        command_runner=fake_runner,
+    )
+
+    assert out == preview_path
+    assert called["at_ms"] == 1200
+    assert called["play_res"] == (1920, 1080)
+    assert captured and "-filter_complex" in captured[0]
+    assert "overlay=0:0:format=auto" in captured[0][captured[0].index("-filter_complex") + 1]
+    assert not preview_path.with_suffix(".word_jump.png").exists()
     assert not preview_path.with_suffix(".preview.ass").exists()
 
 

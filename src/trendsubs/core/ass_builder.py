@@ -63,6 +63,8 @@ def build_ass_document(
         animation=options.animation,
         preset=options.preset,
         max_words_per_line=options.max_words_per_line,
+        play_res=play_res,
+        margin_v=margin_v,
     )
     return f"{header}\n" + "\n".join(dialogue_lines) + "\n"
 
@@ -74,9 +76,22 @@ def _build_dialogue_lines(
     animation: str,
     preset: str,
     max_words_per_line: int,
+    play_res: tuple[int, int],
+    margin_v: int,
 ) -> list[str]:
     dialogue_lines: list[str] = []
     for cue in cues:
+        if mode == "word-pill":
+            dialogue_lines.extend(
+                _build_word_pill_dialogue_lines(
+                    cue=cue,
+                    style_name=style_name,
+                    preset=preset,
+                    play_res=play_res,
+                    margin_v=margin_v,
+                )
+            )
+            continue
         if mode == "reveal":
             dialogue_lines.extend(
                 _build_reveal_dialogue_lines(
@@ -101,11 +116,16 @@ def _build_dialogue_lines(
 
         break_indices = _resolve_line_break_indices(cue, max_words_per_line=max_words_per_line)
         animation_prefix = _build_animation_prefix(cue.start_ms, cue.end_ms, animation)
+        karaoke_text = (
+            _build_fading_karaoke_text(cue, preset, break_indices)
+            if animation == "fade-words"
+            else _build_karaoke_text(cue, preset, break_indices)
+        )
         dialogue_lines.append(
             "Dialogue: 0,"
             f"{_format_ass_timestamp(cue.start_ms)},{_format_ass_timestamp(cue.end_ms)},{style_name},,"
             "0,0,0,,"
-            f"{animation_prefix}{_build_karaoke_text(cue, preset, break_indices)}"
+            f"{animation_prefix}{karaoke_text}"
         )
     return dialogue_lines
 
@@ -119,6 +139,29 @@ def _build_karaoke_text(cue: SubtitleCue, preset: str, break_indices: list[int])
         if index in break_set:
             token = r"\N" + token
         parts.append(rf"{{\k{duration_cs}}}{token}")
+    return " ".join(parts)
+
+
+def _build_fading_karaoke_text(cue: SubtitleCue, preset: str, break_indices: list[int]) -> str:
+    parts: list[str] = []
+    break_set = {index for index in break_indices if 0 < index < len(cue.word_slices)}
+    cue_duration_ms = max(1, cue.end_ms - cue.start_ms)
+    fade_ms = min(420, max(80, cue_duration_ms // 3))
+
+    for index, word in enumerate(cue.word_slices):
+        duration_cs = max(1, round((word.end_ms - word.start_ms) / 10))
+        token = word.text.upper() if preset == "impact-caps" else word.text
+        if index in break_set:
+            token = r"\N" + token
+
+        word_end_ms = max(0, word.end_ms - cue.start_ms)
+        fade_start_ms = min(max(0, word_end_ms), max(0, cue_duration_ms - fade_ms))
+        fade_end_ms = min(cue_duration_ms, fade_start_ms + fade_ms)
+        parts.append(
+            rf"{{\k{duration_cs}\alpha&H00&\t({fade_start_ms},{fade_end_ms},\alpha&HFF&)}}"
+            f"{token}"
+            r"{\alpha&H00&}"
+        )
     return " ".join(parts)
 
 
@@ -174,6 +217,58 @@ def _build_word_dialogue_lines(
             f"{_format_ass_timestamp(start_ms)},{_format_ass_timestamp(end_ms)},{style_name},,"
             "0,0,0,,"
             f"{animation_prefix}{unit['text']}"
+        )
+
+    return dialogue_lines
+
+
+def _build_word_pill_dialogue_lines(
+    cue: SubtitleCue,
+    style_name: str,
+    preset: str,
+    play_res: tuple[int, int],
+    margin_v: int,
+) -> list[str]:
+    if not cue.word_slices:
+        return []
+
+    word_units = _build_word_units(cue, preset)
+    word_units = _group_word_units_for_readability(word_units, cue_end_ms=cue.end_ms, min_display_ms=180)
+    center_x = play_res[0] // 2
+    text_y = max(80, play_res[1] - margin_v)
+    mascot_y = max(40, text_y - 96)
+    dialogue_lines: list[str] = []
+
+    for index, unit in enumerate(word_units):
+        next_start = word_units[index + 1]["start_ms"] if index + 1 < len(word_units) else cue.end_ms
+        start_ms = int(unit["start_ms"])
+        end_ms = max(start_ms + 1, int(next_start))
+        start_ts = _format_ass_timestamp(start_ms)
+        end_ts = _format_ass_timestamp(end_ms)
+
+        dialogue_lines.append(
+            "Dialogue: 1,"
+            f"{start_ts},{end_ts},{style_name},,"
+            "0,0,0,,"
+            rf"{{\an2\pos({center_x},{mascot_y})\c&H2C2CFF&\p1}}"
+            "m -16 -24 l 16 -24 l 16 -12 l 8 -12 l 8 0 l -8 0 l -8 -12 l -16 -12"
+            r"{\p0}"
+        )
+        dialogue_lines.append(
+            "Dialogue: 1,"
+            f"{start_ts},{end_ts},{style_name},,"
+            "0,0,0,,"
+            rf"{{\an2\pos({center_x},{mascot_y})\c&HFF7A00&\p1}}"
+            "m -10 0 l 10 0 l 14 28 l 6 28 l 4 12 l -4 12 l -6 28 l -14 28"
+            r"{\p0}"
+        )
+        dialogue_lines.append(
+            "Dialogue: 2,"
+            f"{start_ts},{end_ts},{style_name},,"
+            "0,0,0,,"
+            rf"{{\an2\pos({center_x},{text_y})\c&HFFFFFF&\3c&HFF7A00&\bord18\blur1\shad0}}"
+            f"{unit['text']}"
+            r"{\r}"
         )
 
     return dialogue_lines
@@ -306,6 +401,11 @@ def _join_words_with_breaks(words: list[str], break_indices: list[int]) -> str:
 
 def _build_animation_prefix(start_ms: int, end_ms: int, animation: str) -> str:
     duration_ms = max(1, end_ms - start_ms)
+
+    if animation == "fade":
+        fade_in = min(220, max(1, duration_ms // 3))
+        fade_out = min(520, max(1, duration_ms - fade_in))
+        return rf"{{\fad({fade_in},{fade_out})}}"
 
     if animation == "float":
         rise_end = min(280, duration_ms)
