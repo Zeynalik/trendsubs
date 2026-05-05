@@ -311,6 +311,12 @@ def _draw_cue_frame(
             progress=progress,
             jump_height=max(42, round(font_size * 0.85)),
         )
+        mascot_center = _clamp_mascot_center(
+            center=mascot_center,
+            play_res=play_res,
+            font_size=font_size,
+            mascot_image=mascot_image,
+        )
         if mascot_image is None:
             _draw_retro_plumber(draw=draw, center=mascot_center, scale=max(0.7, font_size / 72))
         else:
@@ -522,6 +528,28 @@ def _mascot_anchor(box: tuple[int, int, int, int]) -> FrameCenter:
     return round((box[0] + box[2]) / 2), box[1] - 34
 
 
+def _clamp_mascot_center(
+    *,
+    center: FrameCenter,
+    play_res: tuple[int, int],
+    font_size: int,
+    mascot_image: Image.Image | None,
+) -> FrameCenter:
+    if mascot_image is None:
+        scale = max(0.7, font_size / 72)
+        width = round(54 * scale)
+        top_extent = round(54 * scale)
+        bottom_extent = round(20 * scale)
+    else:
+        width, top_extent = _image_mascot_size(mascot_image=mascot_image, font_size=font_size)
+        bottom_extent = 0
+
+    half_width = max(1, width // 2)
+    x = max(half_width + 4, min(play_res[0] - half_width - 4, center[0]))
+    y = max(top_extent + 4, min(play_res[1] - bottom_extent - 4, center[1]))
+    return round(x), round(y)
+
+
 def _draw_image_mascot(
     *,
     frame: Image.Image,
@@ -529,14 +557,19 @@ def _draw_image_mascot(
     center: FrameCenter,
     font_size: int,
 ) -> None:
-    target_height = max(54, round(font_size * 1.55))
-    ratio = target_height / max(1, mascot_image.height)
-    target_width = max(1, round(mascot_image.width * ratio))
+    target_width, target_height = _image_mascot_size(mascot_image=mascot_image, font_size=font_size)
     resampling = getattr(Image.Resampling, "LANCZOS", Image.BICUBIC)
     sprite = mascot_image.resize((target_width, target_height), resampling)
     x = round(center[0] - target_width / 2)
     y = round(center[1] - target_height)
     frame.alpha_composite(sprite, (x, y))
+
+
+def _image_mascot_size(*, mascot_image: Image.Image, font_size: int) -> tuple[int, int]:
+    target_height = max(54, round(font_size * 1.55))
+    ratio = target_height / max(1, mascot_image.height)
+    target_width = max(1, round(mascot_image.width * ratio))
+    return target_width, target_height
 
 
 def _draw_retro_plumber(

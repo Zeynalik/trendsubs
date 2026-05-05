@@ -4,6 +4,7 @@ from trendsubs.core.models import SubtitleCue, WordSlice
 from trendsubs.core.word_jump_overlay import (
     _active_cue,
     _active_word_index,
+    _clamp_mascot_center,
     _draw_active_word,
     _jump_position,
     _layout_words,
@@ -121,3 +122,15 @@ def test_active_word_draws_red_reference_pill_with_white_inner_border():
     assert image.getpixel((58, 38))[3] > 0
     assert image.getpixel((145, 47))[:3] == (220, 18, 50)
     assert min(image.getpixel((62, 42))[:3]) >= 180
+
+
+def test_mascot_center_is_clamped_inside_frame_when_subtitles_are_high():
+    clamped = _clamp_mascot_center(
+        center=(120, -40),
+        play_res=(320, 180),
+        font_size=64,
+        mascot_image=Image.new("RGBA", (100, 200), (255, 0, 0, 255)),
+    )
+
+    assert clamped[0] == 120
+    assert clamped[1] >= 100
