@@ -433,15 +433,25 @@ def _draw_active_word(
     outline_color: RgbaColor,
     outline_width: int,
 ) -> None:
-    pad_x = max(10, round(font_size * 0.28))
-    pad_y = max(6, round(font_size * 0.18))
+    pad_x = max(8, round(font_size * 0.22))
+    pad_y = max(5, round(font_size * 0.14))
     pill = (box[0] - pad_x, box[1] - pad_y, box[2] + pad_x, box[3] + pad_y)
+    radius = max(8, round(font_size * 0.20))
+    glow_spread = max(4, round(font_size * 0.11))
+    glow = (
+        pill[0] - glow_spread,
+        pill[1] - glow_spread,
+        pill[2] + glow_spread,
+        pill[3] + glow_spread,
+    )
+    glow_color = _darken_color(active_fill_color, alpha=130)
+    draw.rounded_rectangle(glow, radius=radius + glow_spread, fill=glow_color)
     draw.rounded_rectangle(
         pill,
-        radius=max(10, round(font_size * 0.24)),
+        radius=radius,
         fill=active_fill_color,
-        outline=(255, 255, 255, 215),
-        width=max(2, round(font_size * 0.04)),
+        outline=(255, 255, 255, 235),
+        width=max(2, round(font_size * 0.055)),
     )
     _draw_word_text(
         draw=draw,
@@ -501,6 +511,11 @@ def _draw_word_text(
 
 def _text_stroke_width(font_size: int, outline_width: int) -> int:
     return max(1, round(outline_width * max(0.8, font_size / 48)))
+
+
+def _darken_color(color: RgbaColor, *, alpha: int) -> RgbaColor:
+    red, green, blue, _original_alpha = color
+    return (round(red * 0.55), round(green * 0.20), round(blue * 0.25), alpha)
 
 
 def _mascot_anchor(box: tuple[int, int, int, int]) -> FrameCenter:

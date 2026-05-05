@@ -1,7 +1,14 @@
 from PIL import Image, ImageDraw, ImageFont
 
 from trendsubs.core.models import SubtitleCue, WordSlice
-from trendsubs.core.word_jump_overlay import _active_cue, _active_word_index, _jump_position, _layout_words, _load_font
+from trendsubs.core.word_jump_overlay import (
+    _active_cue,
+    _active_word_index,
+    _draw_active_word,
+    _jump_position,
+    _layout_words,
+    _load_font,
+)
 
 
 def test_active_word_index_follows_word_timings():
@@ -90,3 +97,27 @@ def test_load_font_rejects_invalid_font_file(tmp_path):
         assert str(font_path) in str(error)
     else:
         raise AssertionError("invalid font file was silently accepted")
+
+
+def test_active_word_draws_red_reference_pill_with_white_inner_border():
+    image = Image.new("RGBA", (220, 120), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+    font_size = 36
+    box = (62, 42, 150, 78)
+
+    _draw_active_word(
+        draw=draw,
+        word="GUYS",
+        box=box,
+        origin=(62, 38),
+        font=ImageFont.load_default(),
+        font_size=font_size,
+        active_fill_color=(220, 18, 50, 235),
+        active_text_color=(255, 255, 255, 255),
+        outline_color=(0, 0, 0, 230),
+        outline_width=5,
+    )
+
+    assert image.getpixel((58, 38))[3] > 0
+    assert image.getpixel((145, 47))[:3] == (220, 18, 50)
+    assert min(image.getpixel((62, 42))[:3]) >= 180

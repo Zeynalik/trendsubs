@@ -166,6 +166,7 @@ def test_render_subtitled_video_word_pill_uses_jump_overlay_renderer(tmp_path: P
     assert called["play_res"] == (1920, 1080)
     assert called["max_words_per_line"] == 2
     assert called["active_fill_color"] == (255, 216, 77, 235)
+    assert called["active_text_color"] == (255, 255, 255, 255)
     assert called["inactive_text_color"] == (255, 255, 255, 230)
     assert called["outline_color"] == (16, 16, 16, 230)
     assert called["outline_width"] == 3

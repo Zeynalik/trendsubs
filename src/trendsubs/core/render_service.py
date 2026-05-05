@@ -108,7 +108,7 @@ def _resolve_word_pill_style(options: RenderOptions) -> dict[str, tuple[int, int
     active_fill = _hex_to_rgba(options.accent_color, alpha=235)
     return {
         "active_fill_color": active_fill,
-        "active_text_color": _contrast_text_color(active_fill),
+        "active_text_color": (255, 255, 255, 255),
         "inactive_text_color": _ass_bgr_to_rgba(str(preset["primary_color"]), alpha=230),
         "outline_color": _ass_bgr_to_rgba(str(preset["outline_color"]), alpha=230),
         "outline_width": int(preset["outline"]),
@@ -137,14 +137,6 @@ def _ass_bgr_to_rgba(color: str, *, alpha: int) -> tuple[int, int, int, int]:
         int(normalized[2:4], 16),
         alpha,
     )
-
-
-def _contrast_text_color(background: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
-    red, green, blue, _alpha = background
-    luminance = (0.299 * red) + (0.587 * green) + (0.114 * blue)
-    if luminance > 180:
-        return (0, 0, 0, 255)
-    return (255, 255, 255, 255)
 
 
 def _default_mascot_path() -> Path | None:
