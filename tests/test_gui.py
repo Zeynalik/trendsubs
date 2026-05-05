@@ -51,6 +51,7 @@ def test_trendsubs_window_builds_expected_form_fields():
     assert window.animation_combo.count() == 6
     assert window.font_combo.count() >= 1
     assert window.auto_scale_check.isChecked() is True
+    assert window.mascot_check.isChecked() is True
     assert window.render_button.text() == "Render"
     assert window.preview_button.text() == "Preview Frame"
     assert window.size_input.text() == "40"
@@ -134,6 +135,7 @@ def test_trendsubs_window_persists_settings_except_video_and_srt(tmp_path, monke
     first_window.max_caption_words_input.setText("7")
     first_window.preview_time_input.setText("4.5")
     first_window.auto_scale_check.setChecked(False)
+    first_window.mascot_check.setChecked(False)
     first_window.close()
 
     second_window = TrendSubsWindow()
@@ -152,6 +154,7 @@ def test_trendsubs_window_persists_settings_except_video_and_srt(tmp_path, monke
     assert second_window.max_caption_words_input.text() == "7"
     assert second_window.preview_time_input.text() == "4.5"
     assert second_window.auto_scale_check.isChecked() is False
+    assert second_window.mascot_check.isChecked() is False
     second_window.close()
     app.quit()
 
@@ -193,6 +196,7 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     window.max_caption_words_input.setText("8")
     window.safe_area_input.setText("15")
     window.auto_scale_check.setChecked(False)
+    window.mascot_check.setChecked(False)
     window.run_render()
 
     assert called["video_path"] == video_path
@@ -204,6 +208,7 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     assert called["options"].max_words_per_caption == 8
     assert called["options"].safe_area_offset == 15
     assert called["options"].auto_font_scale is False
+    assert called["options"].mascot_enabled is False
     assert "Font: font.ttf" in window.log_output.toPlainText()
     assert "Rendered video" in window.log_output.toPlainText()
     app.quit()

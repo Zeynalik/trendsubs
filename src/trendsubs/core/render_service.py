@@ -65,6 +65,8 @@ def render_subtitled_video(
                 inactive_text_color=style["inactive_text_color"],
                 outline_color=style["outline_color"],
                 outline_width=style["outline_width"],
+                mascot_enabled=options.mascot_enabled,
+                mascot_image_path=_default_mascot_path(),
                 command_runner=runner,
             )
             command = build_overlay_command(
@@ -145,6 +147,13 @@ def _contrast_text_color(background: tuple[int, int, int, int]) -> tuple[int, in
     return (255, 255, 255, 255)
 
 
+def _default_mascot_path() -> Path | None:
+    mascot_path = Path(__file__).resolve().parents[3] / "assets" / "mascot" / "manat_character.png"
+    if mascot_path.exists():
+        return mascot_path
+    return None
+
+
 def render_preview_frame(
     video_path: Path,
     srt_path: Path,
@@ -190,6 +199,8 @@ def render_preview_frame(
                 inactive_text_color=style["inactive_text_color"],
                 outline_color=style["outline_color"],
                 outline_width=style["outline_width"],
+                mascot_enabled=options.mascot_enabled,
+                mascot_image_path=_default_mascot_path(),
             )
             command = build_overlay_preview_command(
                 video_path=video_path,

@@ -32,6 +32,8 @@ def render_word_jump_overlay(
     inactive_text_color: RgbaColor = (255, 255, 255, 230),
     outline_color: RgbaColor = (0, 0, 0, 210),
     outline_width: int = 3,
+    mascot_enabled: bool = True,
+    mascot_image_path: Path | None = None,
     fps: int = 30,
     command_runner=None,
 ) -> Path:
@@ -40,6 +42,7 @@ def render_word_jump_overlay(
     total_ms = max((cue.end_ms for cue in cues), default=0)
     frame_count = max(1, math.ceil(total_ms / 1000 * fps) + 1)
     font = _load_font(font_path=font_path, font_size=font_size)
+    mascot_image = _load_mascot_image(mascot_image_path) if mascot_enabled else None
 
     with tempfile.TemporaryDirectory(prefix="trendsubs_word_jump_") as temp_dir:
         frames_dir = Path(temp_dir)
@@ -59,6 +62,8 @@ def render_word_jump_overlay(
                 inactive_text_color=inactive_text_color,
                 outline_color=outline_color,
                 outline_width=outline_width,
+                mascot_enabled=mascot_enabled,
+                mascot_image=mascot_image,
             )
             frame.save(frames_dir / f"{frame_index:06d}.png")
 
@@ -97,9 +102,12 @@ def render_word_jump_frame(
     inactive_text_color: RgbaColor = (255, 255, 255, 230),
     outline_color: RgbaColor = (0, 0, 0, 210),
     outline_width: int = 3,
+    mascot_enabled: bool = True,
+    mascot_image_path: Path | None = None,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font = _load_font(font_path=font_path, font_size=font_size)
+    mascot_image = _load_mascot_image(mascot_image_path) if mascot_enabled else None
     frame = _build_word_jump_frame(
         cues=cues,
         at_ms=at_ms,
@@ -114,6 +122,8 @@ def render_word_jump_frame(
         inactive_text_color=inactive_text_color,
         outline_color=outline_color,
         outline_width=outline_width,
+        mascot_enabled=mascot_enabled,
+        mascot_image=mascot_image,
     )
     frame.save(output_path)
     return output_path
@@ -163,6 +173,18 @@ def _load_font(*, font_path: Path, font_size: int) -> ImageFont.FreeTypeFont | I
         raise OSError(f"Unable to load font file: {font_path}") from error
 
 
+def _load_mascot_image(mascot_image_path: Path | None) -> Image.Image | None:
+    if mascot_image_path is None:
+        return None
+    if not mascot_image_path.exists():
+        return None
+    try:
+        image = Image.open(mascot_image_path).convert("RGBA")
+    except OSError:
+        return None
+    return image
+
+
 def _active_cue(cues: list[SubtitleCue], at_ms: int) -> SubtitleCue | None:
     for cue in cues:
         if cue.start_ms <= at_ms < cue.end_ms:
@@ -185,12 +207,15 @@ def _build_word_jump_frame(
     inactive_text_color: RgbaColor,
     outline_color: RgbaColor,
     outline_width: int,
+    mascot_enabled: bool,
+    mascot_image: Image.Image | None,
 ) -> Image.Image:
     frame = Image.new("RGBA", play_res, (0, 0, 0, 0))
     draw = ImageDraw.Draw(frame)
     cue = _active_cue(cues, at_ms)
     if cue is not None:
         _draw_cue_frame(
+            frame=frame,
             draw=draw,
             cue=cue,
             at_ms=at_ms,
@@ -205,12 +230,15 @@ def _build_word_jump_frame(
             inactive_text_color=inactive_text_color,
             outline_color=outline_color,
             outline_width=outline_width,
+            mascot_enabled=mascot_enabled,
+            mascot_image=mascot_image,
         )
     return frame
 
 
 def _draw_cue_frame(
     *,
+    frame: Image.Image,
     draw: ImageDraw.ImageDraw,
     cue: SubtitleCue,
     at_ms: int,
@@ -225,6 +253,8 @@ def _draw_cue_frame(
     inactive_text_color: RgbaColor,
     outline_color: RgbaColor,
     outline_width: int,
+    mascot_enabled: bool,
+    mascot_image: Image.Image | None,
 ) -> None:
     word_boxes = _layout_words(
         draw=draw,
@@ -267,20 +297,24 @@ def _draw_cue_frame(
                 outline_width=outline_width,
             )
 
-    previous_index = max(0, active_index - 1)
-    current_word = word_boxes[active_index][0]
-    previous_center = _mascot_anchor(word_boxes[previous_index][1])
-    target_center = _mascot_anchor(word_boxes[active_index][1])
-    word_duration = max(1, current_word.end_ms - current_word.start_ms)
-    jump_ms = min(420, word_duration)
-    progress = (at_ms - current_word.start_ms) / jump_ms
-    mascot_center = _jump_position(
-        previous_center=previous_center,
-        target_center=target_center,
-        progress=progress,
-        jump_height=max(42, round(font_size * 0.85)),
-    )
-    _draw_retro_plumber(draw=draw, center=mascot_center, scale=max(0.7, font_size / 72))
+    if mascot_enabled:
+        previous_index = max(0, active_index - 1)
+        current_word = word_boxes[active_index][0]
+        previous_center = _mascot_anchor(word_boxes[previous_index][1])
+        target_center = _mascot_anchor(word_boxes[active_index][1])
+        word_duration = max(1, current_word.end_ms - current_word.start_ms)
+        jump_ms = min(420, word_duration)
+        progress = (at_ms - current_word.start_ms) / jump_ms
+        mascot_center = _jump_position(
+            previous_center=previous_center,
+            target_center=target_center,
+            progress=progress,
+            jump_height=max(42, round(font_size * 0.85)),
+        )
+        if mascot_image is None:
+            _draw_retro_plumber(draw=draw, center=mascot_center, scale=max(0.7, font_size / 72))
+        else:
+            _draw_image_mascot(frame=frame, mascot_image=mascot_image, center=mascot_center, font_size=font_size)
 
 
 def _layout_words(
@@ -471,6 +505,23 @@ def _text_stroke_width(font_size: int, outline_width: int) -> int:
 
 def _mascot_anchor(box: tuple[int, int, int, int]) -> FrameCenter:
     return round((box[0] + box[2]) / 2), box[1] - 34
+
+
+def _draw_image_mascot(
+    *,
+    frame: Image.Image,
+    mascot_image: Image.Image,
+    center: FrameCenter,
+    font_size: int,
+) -> None:
+    target_height = max(54, round(font_size * 1.55))
+    ratio = target_height / max(1, mascot_image.height)
+    target_width = max(1, round(mascot_image.width * ratio))
+    resampling = getattr(Image.Resampling, "LANCZOS", Image.BICUBIC)
+    sprite = mascot_image.resize((target_width, target_height), resampling)
+    x = round(center[0] - target_width / 2)
+    y = round(center[1] - target_height)
+    frame.alpha_composite(sprite, (x, y))
 
 
 def _draw_retro_plumber(

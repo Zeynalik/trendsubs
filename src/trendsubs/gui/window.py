@@ -133,6 +133,8 @@ class TrendSubsWindow(QWidget):
         self.preview_time_input = QLineEdit("10")
         self.auto_scale_check = QCheckBox("Auto scale font")
         self.auto_scale_check.setChecked(True)
+        self.mascot_check = QCheckBox("Animated Character")
+        self.mascot_check.setChecked(True)
 
         self.preset_combo = QComboBox()
         self.preset_combo.addItems(build_preset_names())
@@ -166,6 +168,7 @@ class TrendSubsWindow(QWidget):
         form.addRow("Max Words/Caption (0=off)", self.max_caption_words_input)
         form.addRow("Preview Time (sec)", self.preview_time_input)
         form.addRow("Auto Scale", self.auto_scale_check)
+        form.addRow("Character", self.mascot_check)
 
         layout = QVBoxLayout()
         layout.addLayout(form)
@@ -358,6 +361,7 @@ class TrendSubsWindow(QWidget):
             max_words_per_caption=max(0, max_caption_words),
             safe_area_offset=max(0, safe_area_offset),
             auto_font_scale=self.auto_scale_check.isChecked(),
+            mascot_enabled=self.mascot_check.isChecked(),
         )
 
     def _selected_font_text(self) -> str:
@@ -380,6 +384,7 @@ class TrendSubsWindow(QWidget):
             "max_caption_words": self.max_caption_words_input.text(),
             "preview_time": self.preview_time_input.text(),
             "auto_scale": self.auto_scale_check.isChecked(),
+            "mascot_enabled": self.mascot_check.isChecked(),
         }
         settings_file = _settings_file_path()
         settings_file.parent.mkdir(parents=True, exist_ok=True)
@@ -429,6 +434,7 @@ class TrendSubsWindow(QWidget):
         )
         self.preview_time_input.setText(str(state.get("preview_time", self.preview_time_input.text()) or self.preview_time_input.text()))
         self.auto_scale_check.setChecked(bool(state.get("auto_scale", True)))
+        self.mascot_check.setChecked(bool(state.get("mascot_enabled", True)))
 
     def _sync_output_path_from_video(self) -> None:
         video_raw = _normalize_path_input(self.video_input.text())
