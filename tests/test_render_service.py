@@ -1,7 +1,15 @@
 from pathlib import Path
 
+from PIL import Image
+
 from trendsubs.core.models import RenderOptions, SubtitleCue, WordSlice
-from trendsubs.core.render_service import _apply_caption_word_limit, render_preview_frame, render_subtitled_video
+from trendsubs.core.render_service import (
+    _apply_caption_word_limit,
+    _build_mascot_overlay_cues,
+    _non_word_pill_mascot_anchor_offset,
+    render_preview_frame,
+    render_subtitled_video,
+)
 
 
 def test_render_subtitled_video_generates_ass_and_invokes_ffmpeg(tmp_path: Path):
@@ -29,6 +37,7 @@ def test_render_subtitled_video_generates_ass_and_invokes_ffmpeg(tmp_path: Path)
         font_size=64,
         bottom_margin=120,
         keep_ass=True,
+        mascot_enabled=False,
     )
 
     result = render_subtitled_video(
@@ -73,6 +82,7 @@ def test_render_subtitled_video_removes_intermediate_ass_when_disabled(tmp_path:
             font_size=64,
             bottom_margin=120,
             keep_ass=False,
+            mascot_enabled=False,
         ),
         command_runner=lambda command: None,
     )
@@ -106,6 +116,7 @@ def test_render_subtitled_video_splits_long_cue_by_max_words_per_caption(tmp_pat
             bottom_margin=120,
             keep_ass=True,
             max_words_per_caption=4,
+            mascot_enabled=False,
         ),
         command_runner=lambda command: None,
     )
@@ -157,6 +168,7 @@ def test_render_subtitled_video_word_pill_uses_jump_overlay_renderer(tmp_path: P
             mode="word-pill",
             max_words_per_line=2,
             mascot_enabled=False,
+            mascot_position="right",
         ),
         command_runner=fake_runner,
     )
@@ -171,6 +183,7 @@ def test_render_subtitled_video_word_pill_uses_jump_overlay_renderer(tmp_path: P
     assert called["outline_color"] == (16, 16, 16, 230)
     assert called["outline_width"] == 3
     assert called["mascot_enabled"] is False
+    assert called["mascot_position"] == "right"
     assert captured
     assert "-filter_complex" in captured[-1]
     assert "overlay=0:0:format=auto" in captured[-1][captured[-1].index("-filter_complex") + 1]
@@ -273,6 +286,7 @@ def test_render_preview_frame_runs_ffmpeg_preview_and_cleans_ass(tmp_path: Path)
             font_size=40,
             bottom_margin=120,
             keep_ass=False,
+            mascot_enabled=False,
         ),
         command_runner=fake_runner,
     )
@@ -370,9 +384,169 @@ def test_render_preview_frame_shifts_to_nearest_subtitle_when_requested_second_h
             font_size=40,
             bottom_margin=120,
             keep_ass=False,
+            mascot_enabled=False,
         ),
         command_runner=fake_runner,
     )
 
     assert captured
     assert captured[0][captured[0].index("-ss") + 1] == "11.000"
+
+
+def test_render_subtitled_video_non_word_pill_can_overlay_mascot(tmp_path: Path, monkeypatch):
+    srt_path = tmp_path / "input.srt"
+    video_path = tmp_path / "input.mp4"
+    font_path = tmp_path / "font.ttf"
+    mascot_path = tmp_path / "mascot.png"
+    output_path = tmp_path / "output.mp4"
+
+    srt_path.write_text(
+        "1\n00:00:01,000 --> 00:00:02,500\nHello brave world\n",
+        encoding="utf-8",
+    )
+    video_path.write_bytes(b"video")
+    font_path.write_bytes(b"font")
+    Image.new("RGBA", (32, 32), (255, 0, 0, 255)).save(mascot_path)
+
+    captured: list[list[str]] = []
+    called = {}
+
+    def fake_runner(command: list[str]) -> None:
+        captured.append(command)
+
+    def fake_overlay_renderer(**kwargs) -> Path:
+        called.update(kwargs)
+        overlay_out = kwargs["output_path"]
+        overlay_out.write_bytes(b"overlay")
+        return overlay_out
+
+    monkeypatch.setattr("trendsubs.core.render_service._default_mascot_path", lambda: mascot_path)
+    monkeypatch.setattr("trendsubs.core.render_service.render_word_jump_overlay", fake_overlay_renderer)
+
+    render_subtitled_video(
+        video_path=video_path,
+        srt_path=srt_path,
+        output_path=output_path,
+        options=RenderOptions(
+            preset="social-pop",
+            font_path=str(font_path),
+            accent_color="#FFD84D",
+            font_size=64,
+            bottom_margin=120,
+            keep_ass=False,
+            mode="word",
+            mascot_enabled=True,
+            mascot_position="left",
+        ),
+        command_runner=fake_runner,
+    )
+
+    assert called["draw_subtitles"] is False
+    assert called["mascot_anchor_offset_y"] == 77
+    assert called["mascot_enabled"] is True
+    assert called["mascot_image_path"] == mascot_path
+    assert called["mascot_position"] == "left"
+    assert len(captured) == 2
+    assert "-filter_complex" in captured[1]
+    assert "overlay=0:0:format=auto" in captured[1][captured[1].index("-filter_complex") + 1]
+
+
+def test_render_preview_frame_non_word_pill_can_overlay_mascot(tmp_path: Path, monkeypatch):
+    srt_path = tmp_path / "input.srt"
+    video_path = tmp_path / "input.mp4"
+    font_path = tmp_path / "font.ttf"
+    mascot_path = tmp_path / "mascot.png"
+    preview_path = tmp_path / "preview.png"
+
+    srt_path.write_text(
+        "1\n00:00:01,000 --> 00:00:02,500\nHello brave world\n",
+        encoding="utf-8",
+    )
+    video_path.write_bytes(b"video")
+    font_path.write_bytes(b"font")
+    Image.new("RGBA", (32, 32), (255, 0, 0, 255)).save(mascot_path)
+
+    called = {}
+
+    def fake_runner(command: list[str]) -> None:
+        if command and command[-1].endswith(".png"):
+            Image.new("RGBA", (1920, 1080), (0, 0, 0, 0)).save(command[-1])
+
+    def fake_overlay_frame(**kwargs) -> Path:
+        called.update(kwargs)
+        Image.new("RGBA", (1920, 1080), (0, 0, 255, 80)).save(kwargs["output_path"])
+        return kwargs["output_path"]
+
+    monkeypatch.setattr("trendsubs.core.render_service._default_mascot_path", lambda: mascot_path)
+    monkeypatch.setattr("trendsubs.core.render_service.render_word_jump_frame", fake_overlay_frame)
+
+    out = render_preview_frame(
+        video_path=video_path,
+        srt_path=srt_path,
+        output_image_path=preview_path,
+        at_seconds=1.2,
+        options=RenderOptions(
+            preset="social-pop",
+            font_path=str(font_path),
+            accent_color="#FFD84D",
+            font_size=40,
+            bottom_margin=120,
+            keep_ass=False,
+            mode="word",
+            mascot_enabled=True,
+            mascot_position="below",
+        ),
+        command_runner=fake_runner,
+    )
+
+    assert out == preview_path
+    assert preview_path.exists()
+    assert called["draw_subtitles"] is False
+    assert called["mascot_anchor_offset_y"] == 48
+    assert called["mascot_enabled"] is True
+    assert called["mascot_image_path"] == mascot_path
+    assert called["mascot_position"] == "below"
+
+
+def test_non_word_pill_mascot_anchor_offset_places_character_on_ass_text():
+    assert _non_word_pill_mascot_anchor_offset(80) == 96
+
+
+def test_word_mode_mascot_overlay_cues_follow_single_displayed_words():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=0,
+        end_ms=900,
+        text="one two",
+        lines=["one two"],
+        word_slices=[
+            WordSlice(text="one", start_ms=0, end_ms=450, is_punctuation=False),
+            WordSlice(text="two", start_ms=450, end_ms=900, is_punctuation=False),
+        ],
+    )
+
+    overlay_cues = _build_mascot_overlay_cues([cue], mode="word", preset="social-pop")
+
+    assert [cue.text for cue in overlay_cues] == ["one", "two"]
+    assert [cue.start_ms for cue in overlay_cues] == [0, 450]
+    assert [cue.end_ms for cue in overlay_cues] == [450, 900]
+
+
+def test_word_mode_mascot_overlay_cues_match_ass_grouped_word_units():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=0,
+        end_ms=500,
+        text="da qadınlar",
+        lines=["da qadınlar"],
+        word_slices=[
+            WordSlice(text="da", start_ms=0, end_ms=90, is_punctuation=False),
+            WordSlice(text="qadınlar", start_ms=90, end_ms=500, is_punctuation=False),
+        ],
+    )
+
+    overlay_cues = _build_mascot_overlay_cues([cue], mode="word", preset="social-pop")
+
+    assert [cue.text for cue in overlay_cues] == ["da qadınlar"]
+    assert [cue.start_ms for cue in overlay_cues] == [0]
+    assert [cue.end_ms for cue in overlay_cues] == [500]

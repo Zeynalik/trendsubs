@@ -36,3 +36,4 @@ class RenderOptions:
     safe_area_offset: int = 0
     auto_font_scale: bool = True
     mascot_enabled: bool = True
+    mascot_position: str = "center"

@@ -33,6 +33,13 @@ COLOR_OPTIONS: dict[str, str] = {
     "Red": "#FF4D4D",
 }
 
+MASCOT_POSITION_OPTIONS: dict[str, str] = {
+    "Center": "center",
+    "Left": "left",
+    "Right": "right",
+    "Below": "below",
+}
+
 
 def build_color_names() -> list[str]:
     return list(COLOR_OPTIONS.keys())
@@ -135,6 +142,9 @@ class TrendSubsWindow(QWidget):
         self.auto_scale_check.setChecked(True)
         self.mascot_check = QCheckBox("Animated Character")
         self.mascot_check.setChecked(True)
+        self.mascot_position_combo = QComboBox()
+        for label, value in MASCOT_POSITION_OPTIONS.items():
+            self.mascot_position_combo.addItem(label, value)
 
         self.preset_combo = QComboBox()
         self.preset_combo.addItems(build_preset_names())
@@ -169,6 +179,7 @@ class TrendSubsWindow(QWidget):
         form.addRow("Preview Time (sec)", self.preview_time_input)
         form.addRow("Auto Scale", self.auto_scale_check)
         form.addRow("Character", self.mascot_check)
+        form.addRow("Character Position", self.mascot_position_combo)
 
         layout = QVBoxLayout()
         layout.addLayout(form)
@@ -279,7 +290,7 @@ class TrendSubsWindow(QWidget):
         except Exception as error:
             self.log_output.append(f"Render failed: {error}")
             return
-        self.log_output.append(f"Font: {Path(options.font_path).name}")
+        self.log_output.append(f"Font: {Path(options.font_path).resolve()}")
         self.log_output.append(f"Rendered video: {output_path}")
 
     def run_preview(self) -> None:
@@ -329,7 +340,7 @@ class TrendSubsWindow(QWidget):
         except Exception as error:
             self.log_output.append(f"Preview failed: {error}")
             return
-        self.log_output.append(f"Font: {Path(options.font_path).name}")
+        self.log_output.append(f"Font: {Path(options.font_path).resolve()}")
         self.log_output.append(f"Preview saved: {preview_path}")
 
     def _build_render_options(self) -> RenderOptions | None:
@@ -362,10 +373,28 @@ class TrendSubsWindow(QWidget):
             safe_area_offset=max(0, safe_area_offset),
             auto_font_scale=self.auto_scale_check.isChecked(),
             mascot_enabled=self.mascot_check.isChecked(),
+            mascot_position=str(self.mascot_position_combo.currentData() or "center"),
         )
 
     def _selected_font_text(self) -> str:
-        return str(self.font_combo.currentData() or "").strip()
+        selected_data = _normalize_path_input(str(self.font_combo.currentData() or ""))
+        if selected_data:
+            return selected_data
+
+        selected_text = self.font_combo.currentText().strip()
+        if not selected_text:
+            return ""
+
+        direct_path = Path(_normalize_path_input(selected_text))
+        if direct_path.exists():
+            return str(direct_path.resolve())
+
+        for font_path in discover_font_paths():
+            path = Path(font_path)
+            if selected_text in {_font_display_name(font_path), path.name, path.stem}:
+                return str(path.resolve())
+
+        return selected_text
 
     def _save_persisted_state(self) -> None:
         state = {
@@ -385,6 +414,7 @@ class TrendSubsWindow(QWidget):
             "preview_time": self.preview_time_input.text(),
             "auto_scale": self.auto_scale_check.isChecked(),
             "mascot_enabled": self.mascot_check.isChecked(),
+            "mascot_position": self.mascot_position_combo.currentText(),
         }
         settings_file = _settings_file_path()
         settings_file.parent.mkdir(parents=True, exist_ok=True)
@@ -435,6 +465,12 @@ class TrendSubsWindow(QWidget):
         self.preview_time_input.setText(str(state.get("preview_time", self.preview_time_input.text()) or self.preview_time_input.text()))
         self.auto_scale_check.setChecked(bool(state.get("auto_scale", True)))
         self.mascot_check.setChecked(bool(state.get("mascot_enabled", True)))
+        saved_mascot_position = str(state.get("mascot_position", "") or "")
+        mascot_position_index = self.mascot_position_combo.findText(saved_mascot_position)
+        if mascot_position_index < 0:
+            mascot_position_index = self.mascot_position_combo.findData(saved_mascot_position)
+        if mascot_position_index >= 0:
+            self.mascot_position_combo.setCurrentIndex(mascot_position_index)
 
     def _sync_output_path_from_video(self) -> None:
         video_raw = _normalize_path_input(self.video_input.text())

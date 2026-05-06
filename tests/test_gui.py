@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pytest
 from PySide6.QtWidgets import QApplication
@@ -35,6 +36,19 @@ def test_font_display_name_uses_font_family_for_real_font():
     assert _font_display_name(font_path) == "Caveat (Caveat-VariableFont_wght.ttf)"
 
 
+def test_trendsubs_window_resolves_font_path_from_visible_combo_text_when_data_is_missing():
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+
+    font_path = os.path.abspath("fonts/Caveat-VariableFont_wght.ttf")
+    window = TrendSubsWindow()
+    window.font_combo.addItem(_font_display_name(font_path))
+    window.font_combo.setCurrentIndex(window.font_combo.count() - 1)
+
+    assert window._selected_font_text() == font_path
+    app.quit()
+
+
 def test_trendsubs_window_builds_expected_form_fields():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     app = QApplication.instance() or QApplication([])
@@ -52,6 +66,7 @@ def test_trendsubs_window_builds_expected_form_fields():
     assert window.font_combo.count() >= 1
     assert window.auto_scale_check.isChecked() is True
     assert window.mascot_check.isChecked() is True
+    assert window.mascot_position_combo.currentText() == "Center"
     assert window.render_button.text() == "Render"
     assert window.preview_button.text() == "Preview Frame"
     assert window.size_input.text() == "40"
@@ -136,6 +151,7 @@ def test_trendsubs_window_persists_settings_except_video_and_srt(tmp_path, monke
     first_window.preview_time_input.setText("4.5")
     first_window.auto_scale_check.setChecked(False)
     first_window.mascot_check.setChecked(False)
+    first_window.mascot_position_combo.setCurrentText("Below")
     first_window.close()
 
     second_window = TrendSubsWindow()
@@ -155,6 +171,7 @@ def test_trendsubs_window_persists_settings_except_video_and_srt(tmp_path, monke
     assert second_window.preview_time_input.text() == "4.5"
     assert second_window.auto_scale_check.isChecked() is False
     assert second_window.mascot_check.isChecked() is False
+    assert second_window.mascot_position_combo.currentText() == "Below"
     second_window.close()
     app.quit()
 
@@ -197,6 +214,7 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     window.safe_area_input.setText("15")
     window.auto_scale_check.setChecked(False)
     window.mascot_check.setChecked(False)
+    window.mascot_position_combo.setCurrentText("Right")
     window.run_render()
 
     assert called["video_path"] == video_path
@@ -209,7 +227,8 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     assert called["options"].safe_area_offset == 15
     assert called["options"].auto_font_scale is False
     assert called["options"].mascot_enabled is False
-    assert "Font: font.ttf" in window.log_output.toPlainText()
+    assert called["options"].mascot_position == "right"
+    assert f"Font: {font_path.resolve()}" in window.log_output.toPlainText()
     assert "Rendered video" in window.log_output.toPlainText()
     app.quit()
 
@@ -377,6 +396,45 @@ def test_trendsubs_window_run_preview_uses_preview_service(tmp_path, monkeypatch
     assert called["output_image_path"] == preview_path
     assert called["at_seconds"] == 2.0
     assert "Preview saved" in window.log_output.toPlainText()
+    app.quit()
+
+
+def test_trendsubs_window_word_pill_preview_passes_selected_font_path(tmp_path, monkeypatch):
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    app = QApplication.instance() or QApplication([])
+
+    video_path = tmp_path / "video.mp4"
+    srt_path = tmp_path / "subs.srt"
+    font_path = Path(os.path.abspath("fonts/Caveat-VariableFont_wght.ttf"))
+    output_path = tmp_path / "out.mp4"
+    preview_path = output_path.with_suffix(".preview.png")
+    video_path.write_bytes(b"video")
+    srt_path.write_text("1\n00:00:00,000 --> 00:00:01,000\nHi\n", encoding="utf-8")
+
+    called = {}
+
+    def fake_preview(**kwargs):
+        called.update(kwargs)
+        preview_path.write_bytes(b"png")
+        return preview_path
+
+    monkeypatch.setattr("trendsubs.gui.window.render_preview_frame", fake_preview)
+
+    window = TrendSubsWindow()
+    font_index = window.font_combo.findData(str(font_path.resolve()))
+    assert font_index >= 0
+
+    window.video_input.setText(str(video_path))
+    window.srt_input.setText(str(srt_path))
+    window.output_input.setText(str(output_path))
+    window.output_dir_input.setText(str(tmp_path))
+    window.font_combo.setCurrentIndex(font_index)
+    window.mode_combo.setCurrentText("word-pill")
+    window.run_preview()
+
+    assert called["options"].mode == "word-pill"
+    assert called["options"].font_path == str(font_path.resolve())
+    assert f"Font: {font_path.resolve()}" in window.log_output.toPlainText()
     app.quit()
 
 

@@ -4,14 +4,21 @@ from dataclasses import dataclass
 from pathlib import Path
 import subprocess
 
-from trendsubs.core.ass_builder import build_ass_document, resolve_effective_font_size
+from PIL import Image
+
+from trendsubs.core.ass_builder import (
+    _build_word_units,
+    _group_word_units_for_readability,
+    build_ass_document,
+    resolve_effective_font_size,
+)
 from trendsubs.core.ffmpeg_runner import (
     build_ffmpeg_command,
     build_overlay_command,
     build_overlay_preview_command,
     build_preview_command,
 )
-from trendsubs.core.models import RenderOptions, SubtitleCue
+from trendsubs.core.models import RenderOptions, SubtitleCue, WordSlice
 from trendsubs.core.presets import PRESETS
 from trendsubs.core.srt_parser import parse_srt_text
 from trendsubs.core.word_timing import split_cue_into_word_slices
@@ -52,7 +59,7 @@ def render_subtitled_video(
         style = _resolve_word_pill_style(options)
         try:
             render_word_jump_overlay(
-                cues=cues,
+                cues=_build_mascot_overlay_cues(cues, mode=options.mode, preset=options.preset),
                 output_path=overlay_path,
                 play_res=play_res,
                 font_path=Path(options.font_path),
@@ -67,6 +74,7 @@ def render_subtitled_video(
                 outline_width=style["outline_width"],
                 mascot_enabled=options.mascot_enabled,
                 mascot_image_path=_default_mascot_path(),
+                mascot_position=options.mascot_position,
                 command_runner=runner,
             )
             command = build_overlay_command(
@@ -84,13 +92,64 @@ def render_subtitled_video(
     ass_path.write_text(ass_text, encoding="utf-8")
 
     runner = command_runner or _run_command
-    command = build_ffmpeg_command(
-        video_path=video_path,
-        ass_path=ass_path,
-        output_path=output_path,
-        font_path=Path(options.font_path),
-    )
-    runner(command)
+    mascot_path = _default_mascot_path() if options.mascot_enabled else None
+    if mascot_path is not None:
+        base_video_path = output_path.with_suffix(".ass_base.mp4")
+        overlay_path = output_path.with_suffix(".mascot.mov")
+        effective_font_size = resolve_effective_font_size(
+            requested_size=options.font_size,
+            play_res_y=play_res[1],
+            cues=cues,
+            auto_font_scale=options.auto_font_scale,
+        )
+        style = _resolve_word_pill_style(options)
+        try:
+            command = build_ffmpeg_command(
+                video_path=video_path,
+                ass_path=ass_path,
+                output_path=base_video_path,
+                font_path=Path(options.font_path),
+            )
+            runner(command)
+            render_word_jump_overlay(
+                cues=_build_mascot_overlay_cues(cues, mode=options.mode, preset=options.preset),
+                output_path=overlay_path,
+                play_res=play_res,
+                font_path=Path(options.font_path),
+                font_size=effective_font_size,
+                bottom_margin=options.bottom_margin,
+                safe_area_offset=options.safe_area_offset,
+                max_words_per_line=options.max_words_per_line,
+                active_fill_color=style["active_fill_color"],
+                active_text_color=style["active_text_color"],
+                inactive_text_color=style["inactive_text_color"],
+                outline_color=style["outline_color"],
+                outline_width=style["outline_width"],
+                mascot_enabled=True,
+                mascot_image_path=mascot_path,
+                draw_subtitles=False,
+                mascot_anchor_offset_y=_non_word_pill_mascot_anchor_offset(effective_font_size),
+                mascot_position=options.mascot_position,
+                command_runner=runner,
+            )
+            runner(
+                build_overlay_command(
+                    video_path=base_video_path,
+                    overlay_path=overlay_path,
+                    output_path=output_path,
+                )
+            )
+        finally:
+            base_video_path.unlink(missing_ok=True)
+            overlay_path.unlink(missing_ok=True)
+    else:
+        command = build_ffmpeg_command(
+            video_path=video_path,
+            ass_path=ass_path,
+            output_path=output_path,
+            font_path=Path(options.font_path),
+        )
+        runner(command)
 
     if not options.keep_ass:
         ass_path.unlink(missing_ok=True)
@@ -177,7 +236,7 @@ def render_preview_frame(
         style = _resolve_word_pill_style(options)
         try:
             render_word_jump_frame(
-                cues=cues,
+                cues=_build_mascot_overlay_cues(cues, mode=options.mode, preset=options.preset),
                 output_path=overlay_image_path,
                 at_ms=round(preview_seconds * 1000),
                 play_res=play_res,
@@ -193,6 +252,7 @@ def render_preview_frame(
                 outline_width=style["outline_width"],
                 mascot_enabled=options.mascot_enabled,
                 mascot_image_path=_default_mascot_path(),
+                mascot_position=options.mascot_position,
             )
             command = build_overlay_preview_command(
                 video_path=video_path,
@@ -210,6 +270,59 @@ def render_preview_frame(
     ass_path.write_text(ass_text, encoding="utf-8")
 
     runner = command_runner or _run_command
+    mascot_path = _default_mascot_path() if options.mascot_enabled else None
+    if mascot_path is not None:
+        preview_base_path = output_image_path.with_suffix(".preview.base.png")
+        mascot_overlay_path = output_image_path.with_suffix(".preview.mascot.png")
+        effective_font_size = resolve_effective_font_size(
+            requested_size=options.font_size,
+            play_res_y=play_res[1],
+            cues=cues,
+            auto_font_scale=options.auto_font_scale,
+        )
+        style = _resolve_word_pill_style(options)
+        try:
+            runner(
+                build_preview_command(
+                    video_path=video_path,
+                    ass_path=ass_path,
+                    output_image_path=preview_base_path,
+                    at_seconds=preview_seconds,
+                    font_path=Path(options.font_path),
+                )
+            )
+            render_word_jump_frame(
+                cues=_build_mascot_overlay_cues(cues, mode=options.mode, preset=options.preset),
+                output_path=mascot_overlay_path,
+                at_ms=round(preview_seconds * 1000),
+                play_res=play_res,
+                font_path=Path(options.font_path),
+                font_size=effective_font_size,
+                bottom_margin=options.bottom_margin,
+                safe_area_offset=options.safe_area_offset,
+                max_words_per_line=options.max_words_per_line,
+                active_fill_color=style["active_fill_color"],
+                active_text_color=style["active_text_color"],
+                inactive_text_color=style["inactive_text_color"],
+                outline_color=style["outline_color"],
+                outline_width=style["outline_width"],
+                mascot_enabled=True,
+                mascot_image_path=mascot_path,
+                draw_subtitles=False,
+                mascot_anchor_offset_y=_non_word_pill_mascot_anchor_offset(effective_font_size),
+                mascot_position=options.mascot_position,
+            )
+            _compose_preview_layers(
+                base_path=preview_base_path,
+                overlay_path=mascot_overlay_path,
+                output_path=output_image_path,
+            )
+        finally:
+            preview_base_path.unlink(missing_ok=True)
+            mascot_overlay_path.unlink(missing_ok=True)
+            ass_path.unlink(missing_ok=True)
+        return output_image_path
+
     command = build_preview_command(
         video_path=video_path,
         ass_path=ass_path,
@@ -220,6 +333,66 @@ def render_preview_frame(
     runner(command)
     ass_path.unlink(missing_ok=True)
     return output_image_path
+
+
+def _compose_preview_layers(*, base_path: Path, overlay_path: Path, output_path: Path) -> None:
+    with Image.open(base_path) as base_source:
+        base_image = base_source.convert("RGBA")
+    with Image.open(overlay_path) as overlay_source:
+        overlay_image = overlay_source.convert("RGBA")
+    base_image.alpha_composite(overlay_image)
+    base_image.save(output_path)
+
+
+def _non_word_pill_mascot_anchor_offset(font_size: int) -> int:
+    return max(0, round(font_size * 1.20))
+
+
+def _build_mascot_overlay_cues(cues: list[SubtitleCue], *, mode: str, preset: str) -> list[SubtitleCue]:
+    if mode != "word":
+        return cues
+
+    overlay_cues: list[SubtitleCue] = []
+    index = 1
+    for cue in cues:
+        word_units = _group_word_units_for_readability(
+            _build_word_units(cue, preset),
+            cue_end_ms=cue.end_ms,
+            min_display_ms=180,
+        )
+        if not word_units:
+            overlay_cues.append(cue)
+            continue
+
+        for word_index, word_unit in enumerate(word_units):
+            next_start = (
+                int(word_units[word_index + 1]["start_ms"])
+                if word_index + 1 < len(word_units)
+                else cue.end_ms
+            )
+            start_ms = int(word_unit["start_ms"])
+            end_ms = max(start_ms + 1, next_start)
+            text = str(word_unit["text"]).strip()
+            overlay_cues.append(
+                SubtitleCue(
+                    index=index,
+                    start_ms=start_ms,
+                    end_ms=end_ms,
+                    text=text,
+                    lines=[text],
+                    word_slices=[
+                        WordSlice(
+                            text=text,
+                            start_ms=start_ms,
+                            end_ms=end_ms,
+                            is_punctuation=False,
+                        )
+                    ],
+                )
+            )
+            index += 1
+
+    return overlay_cues
 
 
 def _resolve_preview_seconds(cues: list, requested_seconds: float) -> float:
