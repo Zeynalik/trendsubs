@@ -164,13 +164,14 @@ def _run_command(command: list[str]) -> None:
 
 def _resolve_word_pill_style(options: RenderOptions) -> dict[str, tuple[int, int, int, int] | int]:
     preset = PRESETS[options.preset]
-    active_fill = _hex_to_rgba(options.accent_color, alpha=235)
+    active_fill = _hex_to_rgba(options.accent_color, alpha=255)
+    outline_width = max(3, int(preset["outline"])) if options.stroke_enabled else 0
     return {
         "active_fill_color": active_fill,
         "active_text_color": (255, 255, 255, 255),
         "inactive_text_color": _ass_bgr_to_rgba(str(preset["primary_color"]), alpha=230),
         "outline_color": _ass_bgr_to_rgba(str(preset["outline_color"]), alpha=230),
-        "outline_width": int(preset["outline"]),
+        "outline_width": outline_width,
     }
 
 

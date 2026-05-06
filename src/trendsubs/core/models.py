@@ -35,5 +35,6 @@ class RenderOptions:
     max_words_per_caption: int = 0
     safe_area_offset: int = 0
     auto_font_scale: bool = True
+    stroke_enabled: bool = True
     mascot_enabled: bool = True
     mascot_position: str = "center"

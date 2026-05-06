@@ -28,9 +28,10 @@ def build_preset_names() -> list[str]:
 
 
 COLOR_OPTIONS: dict[str, str] = {
-    "Yellow": "#FFD84D",
+    "Yellow": "#FFE600",
     "White": "#FFFFFF",
-    "Red": "#FF4D4D",
+    "Red": "#FF2D2D",
+    "Blue": "#008CFF",
 }
 
 MASCOT_POSITION_OPTIONS: dict[str, str] = {
@@ -132,6 +133,8 @@ class TrendSubsWindow(QWidget):
         self.color_combo.addItem("Preset", "__preset__")
         for color_name in build_color_names():
             self.color_combo.addItem(color_name, COLOR_OPTIONS[color_name])
+        self.stroke_check = QCheckBox("Stroke")
+        self.stroke_check.setChecked(True)
         self.size_input = QLineEdit("40")
         self.margin_input = QLineEdit("120")
         self.safe_area_input = QLineEdit("0")
@@ -170,7 +173,7 @@ class TrendSubsWindow(QWidget):
         form.addRow("Preset", self.preset_combo)
         form.addRow("Mode", self.mode_combo)
         form.addRow("Animation", self.animation_combo)
-        form.addRow("Color", self.color_combo)
+        form.addRow("Color", _build_color_row(self.color_combo, self.stroke_check))
         form.addRow("Size", self.size_input)
         form.addRow("Bottom Margin", self.margin_input)
         form.addRow("Safe Area Offset", self.safe_area_input)
@@ -372,6 +375,7 @@ class TrendSubsWindow(QWidget):
             max_words_per_caption=max(0, max_caption_words),
             safe_area_offset=max(0, safe_area_offset),
             auto_font_scale=self.auto_scale_check.isChecked(),
+            stroke_enabled=self.stroke_check.isChecked(),
             mascot_enabled=self.mascot_check.isChecked(),
             mascot_position=str(self.mascot_position_combo.currentData() or "center"),
         )
@@ -406,6 +410,7 @@ class TrendSubsWindow(QWidget):
             "mode": self.mode_combo.currentText(),
             "animation": self.animation_combo.currentText(),
             "color": self.color_combo.currentText(),
+            "stroke_enabled": self.stroke_check.isChecked(),
             "size": self.size_input.text(),
             "margin": self.margin_input.text(),
             "safe_area": self.safe_area_input.text(),
@@ -464,6 +469,7 @@ class TrendSubsWindow(QWidget):
         )
         self.preview_time_input.setText(str(state.get("preview_time", self.preview_time_input.text()) or self.preview_time_input.text()))
         self.auto_scale_check.setChecked(bool(state.get("auto_scale", True)))
+        self.stroke_check.setChecked(bool(state.get("stroke_enabled", True)))
         self.mascot_check.setChecked(bool(state.get("mascot_enabled", True)))
         saved_mascot_position = str(state.get("mascot_position", "") or "")
         mascot_position_index = self.mascot_position_combo.findText(saved_mascot_position)
@@ -584,4 +590,14 @@ def _build_path_row(path_input: QWidget, browse_button: QPushButton) -> QWidget:
     row.setSpacing(8)
     row.addWidget(path_input)
     row.addWidget(browse_button)
+    return container
+
+
+def _build_color_row(color_combo: QComboBox, stroke_check: QCheckBox) -> QWidget:
+    container = QWidget()
+    row = QHBoxLayout(container)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(10)
+    row.addWidget(color_combo, 1)
+    row.addWidget(stroke_check)
     return container

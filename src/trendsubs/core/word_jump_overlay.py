@@ -663,7 +663,9 @@ def _draw_word_text(
 
 
 def _text_stroke_width(font_size: int, outline_width: int) -> int:
-    return max(1, min(outline_width, round(font_size * 0.045)))
+    if outline_width <= 0:
+        return 0
+    return max(2, min(outline_width, round(font_size * 0.06)))
 
 
 def _darken_color(color: RgbaColor, *, alpha: int) -> RgbaColor:

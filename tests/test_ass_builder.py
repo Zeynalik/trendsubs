@@ -290,6 +290,29 @@ def test_build_ass_document_highlight_mode_uses_accent_as_primary_color():
     assert "&H004DD8FF,&H00FFFFFF" in ass_text
 
 
+def test_build_ass_document_can_disable_text_stroke():
+    cue = SubtitleCue(
+        index=1,
+        start_ms=1000,
+        end_ms=2000,
+        text="hello",
+        lines=["hello"],
+    )
+    options = RenderOptions(
+        preset="social-pop",
+        font_path="C:\\Fonts\\MyFont.ttf",
+        accent_color="#00A3FF",
+        font_size=40,
+        bottom_margin=120,
+        keep_ass=False,
+        stroke_enabled=False,
+    )
+
+    ass_text = build_ass_document([cue], options, play_res=(1920, 1080))
+
+    assert ",0,0,2,80,80,120,1" in ass_text
+
+
 def test_build_ass_document_pop_bounce_animation_adds_transform_tags():
     cue = SubtitleCue(
         index=1,

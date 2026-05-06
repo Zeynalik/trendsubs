@@ -32,6 +32,8 @@ def build_ass_document(
         auto_font_scale=options.auto_font_scale,
     )
     margin_v = options.bottom_margin + max(0, options.safe_area_offset)
+    outline = _effective_outline(preset, stroke_enabled=options.stroke_enabled)
+    shadow = int(preset["shadow"]) if options.stroke_enabled else 0
 
     header = "\n".join(
         [
@@ -49,7 +51,7 @@ def build_ass_document(
             "Style: "
             f"{style_name},{font_name},{effective_font_size},{primary_color},{secondary_color},"
             f"{preset['outline_color']},&H00000000,{preset['bold']},0,0,0,100,100,0,0,1,"
-            f"{preset['outline']},{preset['shadow']},{preset['alignment']},80,80,{margin_v},1",
+            f"{outline},{shadow},{preset['alignment']},80,80,{margin_v},1",
             "",
             "[Events]",
             "Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text",
@@ -460,6 +462,12 @@ def _hex_to_ass_bgr(color: str) -> str:
     green = normalized[2:4]
     blue = normalized[4:6]
     return f"&H00{blue}{green}{red}".upper()
+
+
+def _effective_outline(preset: dict[str, str | int], *, stroke_enabled: bool) -> int:
+    if not stroke_enabled:
+        return 0
+    return max(3, int(preset["outline"]))
 
 
 def resolve_effective_font_size(
