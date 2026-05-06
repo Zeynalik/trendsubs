@@ -20,6 +20,10 @@ def test_build_ffmpeg_command_targets_ass_filter_and_h264_output():
     assert any(part.startswith("ass=filename=") and "temp.ass" in part for part in command)
     assert any("fontsdir=" in part for part in command)
     assert "libx264" in command
+    assert command[command.index("-pix_fmt") + 1] == "yuv420p"
+    assert command[command.index("-movflags") + 1] == "+faststart"
+    assert command[command.index("-profile:v") + 1] == "high"
+    assert command[command.index("-level") + 1] == "4.1"
     assert "aac" in command
     assert command[-1] == "output.mp4"
 
@@ -52,6 +56,10 @@ def test_build_overlay_command_composites_transparent_overlay_video():
     assert "-map" in command
     assert "[v]" in command
     assert "0:a?" in command
+    assert command[command.index("-pix_fmt") + 1] == "yuv420p"
+    assert command[command.index("-movflags") + 1] == "+faststart"
+    assert command[command.index("-profile:v") + 1] == "high"
+    assert command[command.index("-level") + 1] == "4.1"
     assert command[-1] == "output.mp4"
 
 
