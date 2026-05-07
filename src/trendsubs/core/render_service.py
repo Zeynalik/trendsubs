@@ -200,7 +200,7 @@ def _ass_bgr_to_rgba(color: str, *, alpha: int) -> tuple[int, int, int, int]:
 
 
 def _default_mascot_path() -> Path | None:
-    mascot_path = Path(__file__).resolve().parents[3] / "assets" / "mascot" / "manat_character.png"
+    mascot_path = Path(__file__).resolve().parents[3] / "assets" / "mascot" / "farik_character.png"
     if mascot_path.exists():
         return mascot_path
     return None

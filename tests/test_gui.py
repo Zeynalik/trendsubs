@@ -83,6 +83,7 @@ def test_trendsubs_window_builds_expected_form_fields():
     assert window.animation_combo.count() == 6
     assert window.font_combo.count() >= 1
     assert window.auto_scale_check.isChecked() is True
+    assert window.mascot_check.text() == "Farik"
     assert window.mascot_check.isChecked() is True
     assert window.mascot_position_combo.currentText() == "Center"
     assert window.render_button.text() == "Render"

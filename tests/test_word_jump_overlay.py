@@ -251,7 +251,7 @@ def test_mascot_frame_selection_supports_appended_six_frame_cycles():
 
 
 def test_default_mascot_sprite_includes_street_fighter_combo_cycles():
-    mascot_path = Path("assets/mascot/manat_character.png")
+    mascot_path = Path("assets/mascot/farik_character.png")
     sprite = _load_mascot_sprite(mascot_path)
 
     assert sprite is not None
@@ -260,7 +260,7 @@ def test_default_mascot_sprite_includes_street_fighter_combo_cycles():
 
 
 def test_street_fighter_combo_key_frames_have_readable_special_actions():
-    frames_dir = Path("assets/mascot/manat_character_frames")
+    frames_dir = Path("assets/mascot/farik_character_frames")
     uppercut = Image.open(frames_dir / "46.png").convert("RGBA")
     stretched_arms = Image.open(frames_dir / "55.png").convert("RGBA")
 
@@ -280,7 +280,7 @@ def test_street_fighter_combo_key_frames_have_readable_special_actions():
 
 
 def test_fatality_combo_key_frames_have_paper_and_portal_effects():
-    frames_dir = Path("assets/mascot/manat_character_frames")
+    frames_dir = Path("assets/mascot/farik_character_frames")
     paper_storm = Image.open(frames_dir / "64.png").convert("RGBA")
     portal = Image.open(frames_dir / "81.png").convert("RGBA")
 

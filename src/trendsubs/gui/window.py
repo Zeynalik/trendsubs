@@ -143,7 +143,7 @@ class TrendSubsWindow(QWidget):
         self.preview_time_input = QLineEdit("10")
         self.auto_scale_check = QCheckBox("Auto scale font")
         self.auto_scale_check.setChecked(True)
-        self.mascot_check = QCheckBox("Animated Character")
+        self.mascot_check = QCheckBox("Farik")
         self.mascot_check.setChecked(True)
         self.mascot_position_combo = QComboBox()
         for label, value in MASCOT_POSITION_OPTIONS.items():
@@ -181,8 +181,8 @@ class TrendSubsWindow(QWidget):
         form.addRow("Max Words/Caption (0=off)", self.max_caption_words_input)
         form.addRow("Preview Time (sec)", self.preview_time_input)
         form.addRow("Auto Scale", self.auto_scale_check)
-        form.addRow("Character", self.mascot_check)
-        form.addRow("Character Position", self.mascot_position_combo)
+        form.addRow("Farik", self.mascot_check)
+        form.addRow("Farik Position", self.mascot_position_combo)
 
         layout = QVBoxLayout()
         layout.addLayout(form)
