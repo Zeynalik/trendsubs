@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication
 from trendsubs.gui.window import (
     TrendSubsWindow,
     _font_display_name,
+    build_character_names,
     build_color_names,
     build_preset_names,
     discover_font_paths,
@@ -34,6 +35,10 @@ def test_build_preset_names_exposes_all_default_presets():
 
 def test_build_color_names_exposes_available_colors():
     assert build_color_names() == ["Yellow", "White", "Red", "Blue"]
+
+
+def test_build_character_names_exposes_available_characters():
+    assert build_character_names() == ["Farik", "Alt Girl"]
 
 
 def test_discover_font_paths_includes_bundled_caption_fonts():
@@ -83,7 +88,9 @@ def test_trendsubs_window_builds_expected_form_fields():
     assert window.animation_combo.count() == 6
     assert window.font_combo.count() >= 1
     assert window.auto_scale_check.isChecked() is True
-    assert window.mascot_check.text() == "Farik"
+    assert window.character_combo.currentText() == "Farik"
+    assert window.character_combo.findText("Alt Girl") >= 0
+    assert window.mascot_check.text() == "Enabled"
     assert window.mascot_check.isChecked() is True
     assert window.mascot_position_combo.currentText() == "Center"
     assert window.render_button.text() == "Render"
@@ -170,6 +177,7 @@ def test_trendsubs_window_persists_settings_except_video_and_srt(tmp_path, monke
     first_window.max_caption_words_input.setText("7")
     first_window.preview_time_input.setText("4.5")
     first_window.auto_scale_check.setChecked(False)
+    first_window.character_combo.setCurrentText("Alt Girl")
     first_window.mascot_check.setChecked(False)
     first_window.mascot_position_combo.setCurrentText("Below")
     first_window.close()
@@ -191,6 +199,7 @@ def test_trendsubs_window_persists_settings_except_video_and_srt(tmp_path, monke
     assert second_window.max_caption_words_input.text() == "7"
     assert second_window.preview_time_input.text() == "4.5"
     assert second_window.auto_scale_check.isChecked() is False
+    assert second_window.character_combo.currentText() == "Alt Girl"
     assert second_window.mascot_check.isChecked() is False
     assert second_window.mascot_position_combo.currentText() == "Below"
     second_window.close()
@@ -235,6 +244,7 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     window.safe_area_input.setText("15")
     window.auto_scale_check.setChecked(False)
     window.stroke_check.setChecked(False)
+    window.character_combo.setCurrentText("Alt Girl")
     window.mascot_check.setChecked(False)
     window.mascot_position_combo.setCurrentText("Right")
     window.run_render()
@@ -249,6 +259,7 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     assert called["options"].safe_area_offset == 15
     assert called["options"].auto_font_scale is False
     assert called["options"].stroke_enabled is False
+    assert called["options"].character_name == "alt_girl"
     assert called["options"].mascot_enabled is False
     assert called["options"].mascot_position == "right"
     assert f"Font: {font_path.resolve()}" in window.log_output.toPlainText()

@@ -6,6 +6,7 @@ from trendsubs.core.models import RenderOptions, SubtitleCue, WordSlice
 from trendsubs.core.render_service import (
     _apply_caption_word_limit,
     _build_mascot_overlay_cues,
+    _default_mascot_path,
     _non_word_pill_mascot_anchor_offset,
     render_preview_frame,
     render_subtitled_video,
@@ -167,6 +168,7 @@ def test_render_subtitled_video_word_pill_uses_jump_overlay_renderer(tmp_path: P
             keep_ass=False,
             mode="word-pill",
             max_words_per_line=2,
+            character_name="alt_girl",
             mascot_enabled=False,
             mascot_position="right",
         ),
@@ -183,6 +185,7 @@ def test_render_subtitled_video_word_pill_uses_jump_overlay_renderer(tmp_path: P
     assert called["outline_color"] == (16, 16, 16, 230)
     assert called["outline_width"] == 3
     assert called["mascot_enabled"] is False
+    assert called["mascot_image_path"] == _default_mascot_path("alt_girl")
     assert called["mascot_position"] == "right"
     assert captured
     assert "-filter_complex" in captured[-1]
@@ -461,7 +464,7 @@ def test_render_subtitled_video_non_word_pill_can_overlay_mascot(tmp_path: Path,
         overlay_out.write_bytes(b"overlay")
         return overlay_out
 
-    monkeypatch.setattr("trendsubs.core.render_service._default_mascot_path", lambda: mascot_path)
+    monkeypatch.setattr("trendsubs.core.render_service._default_mascot_path", lambda character_name="farik": mascot_path)
     monkeypatch.setattr("trendsubs.core.render_service.render_word_jump_overlay", fake_overlay_renderer)
 
     render_subtitled_video(
@@ -518,7 +521,7 @@ def test_render_preview_frame_non_word_pill_can_overlay_mascot(tmp_path: Path, m
         Image.new("RGBA", (1920, 1080), (0, 0, 255, 80)).save(kwargs["output_path"])
         return kwargs["output_path"]
 
-    monkeypatch.setattr("trendsubs.core.render_service._default_mascot_path", lambda: mascot_path)
+    monkeypatch.setattr("trendsubs.core.render_service._default_mascot_path", lambda character_name="farik": mascot_path)
     monkeypatch.setattr("trendsubs.core.render_service.render_word_jump_frame", fake_overlay_frame)
 
     out = render_preview_frame(
@@ -551,6 +554,14 @@ def test_render_preview_frame_non_word_pill_can_overlay_mascot(tmp_path: Path, m
 
 def test_non_word_pill_mascot_anchor_offset_places_character_on_ass_text():
     assert _non_word_pill_mascot_anchor_offset(80) == 96
+
+
+def test_default_mascot_path_can_select_alt_girl_asset():
+    mascot_path = _default_mascot_path("alt_girl")
+
+    assert mascot_path is not None
+    assert mascot_path.name == "alt_girl_character.png"
+    assert mascot_path.exists()
 
 
 def test_word_mode_mascot_overlay_cues_follow_single_displayed_words():

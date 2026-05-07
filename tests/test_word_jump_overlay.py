@@ -259,6 +259,15 @@ def test_default_mascot_sprite_includes_street_fighter_combo_cycles():
     assert len(sprite.frames) % 6 == 0
 
 
+def test_alt_girl_sprite_includes_fighting_and_housework_cycles():
+    mascot_path = Path("assets/mascot/alt_girl_character.png")
+    sprite = _load_mascot_sprite(mascot_path)
+
+    assert sprite is not None
+    assert len(sprite.frames) == 36
+    assert len(sprite.frames) % 6 == 0
+
+
 def test_street_fighter_combo_key_frames_have_readable_special_actions():
     frames_dir = Path("assets/mascot/farik_character_frames")
     uppercut = Image.open(frames_dir / "46.png").convert("RGBA")

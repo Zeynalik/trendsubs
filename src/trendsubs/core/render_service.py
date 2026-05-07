@@ -73,7 +73,7 @@ def render_subtitled_video(
                 outline_color=style["outline_color"],
                 outline_width=style["outline_width"],
                 mascot_enabled=options.mascot_enabled,
-                mascot_image_path=_default_mascot_path(),
+                mascot_image_path=_default_mascot_path(options.character_name),
                 mascot_position=options.mascot_position,
                 command_runner=runner,
             )
@@ -92,7 +92,7 @@ def render_subtitled_video(
     ass_path.write_text(ass_text, encoding="utf-8")
 
     runner = command_runner or _run_command
-    mascot_path = _default_mascot_path() if options.mascot_enabled else None
+    mascot_path = _default_mascot_path(options.character_name) if options.mascot_enabled else None
     if mascot_path is not None:
         base_video_path = output_path.with_suffix(".ass_base.mp4")
         overlay_path = output_path.with_suffix(".mascot.mov")
@@ -199,8 +199,17 @@ def _ass_bgr_to_rgba(color: str, *, alpha: int) -> tuple[int, int, int, int]:
     )
 
 
-def _default_mascot_path() -> Path | None:
-    mascot_path = Path(__file__).resolve().parents[3] / "assets" / "mascot" / "farik_character.png"
+def _default_mascot_path(character_name: str = "farik") -> Path | None:
+    asset_names = {
+        "farik": "farik_character.png",
+        "alt_girl": "alt_girl_character.png",
+    }
+    mascot_path = (
+        Path(__file__).resolve().parents[3]
+        / "assets"
+        / "mascot"
+        / asset_names.get(character_name, "farik_character.png")
+    )
     if mascot_path.exists():
         return mascot_path
     return None
@@ -252,7 +261,7 @@ def render_preview_frame(
                 outline_color=style["outline_color"],
                 outline_width=style["outline_width"],
                 mascot_enabled=options.mascot_enabled,
-                mascot_image_path=_default_mascot_path(),
+                mascot_image_path=_default_mascot_path(options.character_name),
                 mascot_position=options.mascot_position,
             )
             command = build_overlay_preview_command(
@@ -271,7 +280,7 @@ def render_preview_frame(
     ass_path.write_text(ass_text, encoding="utf-8")
 
     runner = command_runner or _run_command
-    mascot_path = _default_mascot_path() if options.mascot_enabled else None
+    mascot_path = _default_mascot_path(options.character_name) if options.mascot_enabled else None
     if mascot_path is not None:
         preview_base_path = output_image_path.with_suffix(".preview.base.png")
         mascot_overlay_path = output_image_path.with_suffix(".preview.mascot.png")

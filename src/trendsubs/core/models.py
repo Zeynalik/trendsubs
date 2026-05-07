@@ -37,4 +37,5 @@ class RenderOptions:
     auto_font_scale: bool = True
     stroke_enabled: bool = True
     mascot_enabled: bool = True
+    character_name: str = "farik"
     mascot_position: str = "center"

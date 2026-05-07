@@ -34,6 +34,11 @@ COLOR_OPTIONS: dict[str, str] = {
     "Blue": "#008CFF",
 }
 
+CHARACTER_OPTIONS: dict[str, str] = {
+    "Farik": "farik",
+    "Alt Girl": "alt_girl",
+}
+
 MASCOT_POSITION_OPTIONS: dict[str, str] = {
     "Center": "center",
     "Left": "left",
@@ -44,6 +49,10 @@ MASCOT_POSITION_OPTIONS: dict[str, str] = {
 
 def build_color_names() -> list[str]:
     return list(COLOR_OPTIONS.keys())
+
+
+def build_character_names() -> list[str]:
+    return list(CHARACTER_OPTIONS.keys())
 
 
 def _preset_accent_hex(preset_name: str) -> str:
@@ -143,7 +152,10 @@ class TrendSubsWindow(QWidget):
         self.preview_time_input = QLineEdit("10")
         self.auto_scale_check = QCheckBox("Auto scale font")
         self.auto_scale_check.setChecked(True)
-        self.mascot_check = QCheckBox("Farik")
+        self.character_combo = QComboBox()
+        for label, value in CHARACTER_OPTIONS.items():
+            self.character_combo.addItem(label, value)
+        self.mascot_check = QCheckBox("Enabled")
         self.mascot_check.setChecked(True)
         self.mascot_position_combo = QComboBox()
         for label, value in MASCOT_POSITION_OPTIONS.items():
@@ -181,8 +193,8 @@ class TrendSubsWindow(QWidget):
         form.addRow("Max Words/Caption (0=off)", self.max_caption_words_input)
         form.addRow("Preview Time (sec)", self.preview_time_input)
         form.addRow("Auto Scale", self.auto_scale_check)
-        form.addRow("Farik", self.mascot_check)
-        form.addRow("Farik Position", self.mascot_position_combo)
+        form.addRow("Character", _build_character_row(self.character_combo, self.mascot_check))
+        form.addRow("Character Position", self.mascot_position_combo)
 
         layout = QVBoxLayout()
         layout.addLayout(form)
@@ -377,6 +389,7 @@ class TrendSubsWindow(QWidget):
             auto_font_scale=self.auto_scale_check.isChecked(),
             stroke_enabled=self.stroke_check.isChecked(),
             mascot_enabled=self.mascot_check.isChecked(),
+            character_name=str(self.character_combo.currentData() or "farik"),
             mascot_position=str(self.mascot_position_combo.currentData() or "center"),
         )
 
@@ -418,6 +431,7 @@ class TrendSubsWindow(QWidget):
             "max_caption_words": self.max_caption_words_input.text(),
             "preview_time": self.preview_time_input.text(),
             "auto_scale": self.auto_scale_check.isChecked(),
+            "character": self.character_combo.currentText(),
             "mascot_enabled": self.mascot_check.isChecked(),
             "mascot_position": self.mascot_position_combo.currentText(),
         }
@@ -470,6 +484,12 @@ class TrendSubsWindow(QWidget):
         self.preview_time_input.setText(str(state.get("preview_time", self.preview_time_input.text()) or self.preview_time_input.text()))
         self.auto_scale_check.setChecked(bool(state.get("auto_scale", True)))
         self.stroke_check.setChecked(bool(state.get("stroke_enabled", True)))
+        saved_character = str(state.get("character", "") or state.get("character_name", "") or "")
+        character_index = self.character_combo.findText(saved_character)
+        if character_index < 0:
+            character_index = self.character_combo.findData(saved_character)
+        if character_index >= 0:
+            self.character_combo.setCurrentIndex(character_index)
         self.mascot_check.setChecked(bool(state.get("mascot_enabled", True)))
         saved_mascot_position = str(state.get("mascot_position", "") or "")
         mascot_position_index = self.mascot_position_combo.findText(saved_mascot_position)
@@ -600,4 +620,14 @@ def _build_color_row(color_combo: QComboBox, stroke_check: QCheckBox) -> QWidget
     row.setSpacing(10)
     row.addWidget(color_combo, 1)
     row.addWidget(stroke_check)
+    return container
+
+
+def _build_character_row(character_combo: QComboBox, enabled_check: QCheckBox) -> QWidget:
+    container = QWidget()
+    row = QHBoxLayout(container)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(10)
+    row.addWidget(character_combo, 1)
+    row.addWidget(enabled_check)
     return container
