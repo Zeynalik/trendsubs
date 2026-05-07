@@ -39,7 +39,12 @@ def test_build_color_names_exposes_available_colors():
 def test_discover_font_paths_includes_bundled_caption_fonts():
     font_names = {Path(font_path).name for font_path in discover_font_paths()}
 
-    assert {"Anton-Regular.ttf", "Bangers-Regular.ttf", "Montserrat-VariableFont_wght.ttf"}.issubset(font_names)
+    assert {
+        "Anton-Regular.ttf",
+        "Bangers-Regular.ttf",
+        "BebasNeue-Regular.ttf",
+        "Montserrat-VariableFont_wght.ttf",
+    }.issubset(font_names)
 
 
 def test_font_display_name_uses_font_family_for_real_font():
