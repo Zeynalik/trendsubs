@@ -24,6 +24,9 @@ class MascotSprite:
     reference_visible_height: int | None = None
 
 
+MascotLayer = tuple[MascotSprite | None, str]
+
+
 def render_word_jump_overlay(
     *,
     cues: list[SubtitleCue],
@@ -41,6 +44,7 @@ def render_word_jump_overlay(
     outline_width: int = 3,
     mascot_enabled: bool = True,
     mascot_image_path: Path | None = None,
+    mascot_layers: list[tuple[Path, str]] | None = None,
     draw_subtitles: bool = True,
     mascot_anchor_offset_y: int = 0,
     mascot_position: str = "center",
@@ -53,6 +57,12 @@ def render_word_jump_overlay(
     frame_count = max(1, math.ceil(total_ms / 1000 * fps) + 1)
     font = _load_font(font_path=font_path, font_size=font_size)
     mascot_sprite = _load_mascot_sprite(mascot_image_path) if mascot_enabled else None
+    loaded_mascot_layers = _load_mascot_layers(
+        mascot_enabled=mascot_enabled,
+        mascot_sprite=mascot_sprite,
+        mascot_position=mascot_position,
+        mascot_layers=mascot_layers,
+    )
 
     with tempfile.TemporaryDirectory(prefix="trendsubs_word_jump_") as temp_dir:
         frames_dir = Path(temp_dir)
@@ -73,7 +83,7 @@ def render_word_jump_overlay(
                 outline_color=outline_color,
                 outline_width=outline_width,
                 mascot_enabled=mascot_enabled,
-                mascot_sprite=mascot_sprite,
+                mascot_layers=loaded_mascot_layers,
                 draw_subtitles=draw_subtitles,
                 mascot_anchor_offset_y=mascot_anchor_offset_y,
                 mascot_position=mascot_position,
@@ -117,6 +127,7 @@ def render_word_jump_frame(
     outline_width: int = 3,
     mascot_enabled: bool = True,
     mascot_image_path: Path | None = None,
+    mascot_layers: list[tuple[Path, str]] | None = None,
     draw_subtitles: bool = True,
     mascot_anchor_offset_y: int = 0,
     mascot_position: str = "center",
@@ -124,6 +135,12 @@ def render_word_jump_frame(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     font = _load_font(font_path=font_path, font_size=font_size)
     mascot_sprite = _load_mascot_sprite(mascot_image_path) if mascot_enabled else None
+    loaded_mascot_layers = _load_mascot_layers(
+        mascot_enabled=mascot_enabled,
+        mascot_sprite=mascot_sprite,
+        mascot_position=mascot_position,
+        mascot_layers=mascot_layers,
+    )
     frame = _build_word_jump_frame(
         cues=cues,
         at_ms=at_ms,
@@ -139,7 +156,7 @@ def render_word_jump_frame(
         outline_color=outline_color,
         outline_width=outline_width,
         mascot_enabled=mascot_enabled,
-        mascot_sprite=mascot_sprite,
+        mascot_layers=loaded_mascot_layers,
         draw_subtitles=draw_subtitles,
         mascot_anchor_offset_y=mascot_anchor_offset_y,
         mascot_position=mascot_position,
@@ -248,6 +265,24 @@ def _load_mascot_sprite(mascot_image_path: Path | None) -> MascotSprite | None:
     return MascotSprite(frames=frames, reference_visible_height=reference_visible_height)
 
 
+def _load_mascot_layers(
+    *,
+    mascot_enabled: bool,
+    mascot_sprite: MascotSprite | None,
+    mascot_position: str,
+    mascot_layers: list[tuple[Path, str]] | None,
+) -> list[MascotLayer]:
+    if mascot_layers is not None:
+        return [
+            (sprite, position)
+            for mascot_path, position in mascot_layers
+            if (sprite := _load_mascot_sprite(mascot_path)) is not None
+        ]
+    if mascot_enabled:
+        return [(mascot_sprite, mascot_position)]
+    return []
+
+
 def _active_cue(cues: list[SubtitleCue], at_ms: int) -> SubtitleCue | None:
     for cue in cues:
         if cue.start_ms <= at_ms < cue.end_ms:
@@ -271,7 +306,7 @@ def _build_word_jump_frame(
     outline_color: RgbaColor,
     outline_width: int,
     mascot_enabled: bool,
-    mascot_sprite: MascotSprite | None,
+    mascot_layers: list[MascotLayer],
     draw_subtitles: bool,
     mascot_anchor_offset_y: int,
     mascot_position: str,
@@ -297,7 +332,7 @@ def _build_word_jump_frame(
             outline_color=outline_color,
             outline_width=outline_width,
             mascot_enabled=mascot_enabled,
-            mascot_sprite=mascot_sprite,
+            mascot_layers=mascot_layers,
             draw_subtitles=draw_subtitles,
             mascot_anchor_offset_y=mascot_anchor_offset_y,
             mascot_position=mascot_position,
@@ -323,7 +358,7 @@ def _draw_cue_frame(
     outline_color: RgbaColor,
     outline_width: int,
     mascot_enabled: bool,
-    mascot_sprite: MascotSprite | None,
+    mascot_layers: list[MascotLayer],
     draw_subtitles: bool,
     mascot_anchor_offset_y: int,
     mascot_position: str,
@@ -370,48 +405,11 @@ def _draw_cue_frame(
                     outline_width=outline_width,
                 )
 
-    if mascot_enabled:
+    if mascot_layers:
         previous_index = max(0, active_index - 1)
         current_word = word_boxes[active_index][0]
         word_duration = max(1, current_word.end_ms - current_word.start_ms)
         action_progress = (at_ms - current_word.start_ms) / word_duration
-        mascot_frame = (
-            _select_mascot_frame(
-                mascot_sprite=mascot_sprite,
-                progress=action_progress,
-                word_index=_mascot_action_index(cue=cue, active_index=active_index),
-            )
-            if mascot_sprite is not None
-            else None
-        )
-        previous_center = _mascot_anchor(
-            word_boxes[previous_index][1],
-            font_size=font_size,
-            offset_y=mascot_anchor_offset_y,
-            position=mascot_position,
-        )
-        target_center = _mascot_anchor(
-            word_boxes[active_index][1],
-            font_size=font_size,
-            offset_y=mascot_anchor_offset_y,
-            position=mascot_position,
-        )
-        previous_center = _separate_mascot_from_word(
-            center=previous_center,
-            word_box=word_boxes[previous_index][1],
-            font_size=font_size,
-            position=mascot_position,
-            mascot_sprite=mascot_sprite,
-            mascot_frame=mascot_frame,
-        )
-        target_center = _separate_mascot_from_word(
-            center=target_center,
-            word_box=word_boxes[active_index][1],
-            font_size=font_size,
-            position=mascot_position,
-            mascot_sprite=mascot_sprite,
-            mascot_frame=mascot_frame,
-        )
         jump_progress = _mascot_jump_progress(
             previous_index=previous_index,
             active_index=active_index,
@@ -419,34 +417,73 @@ def _draw_cue_frame(
             word_start_ms=current_word.start_ms,
             word_duration_ms=word_duration,
         )
-        mascot_center = _jump_position(
-            previous_center=previous_center,
-            target_center=target_center,
-            progress=jump_progress,
-            jump_height=_mascot_jump_height(font_size),
-        )
-        if mascot_sprite is None:
-            mascot_center = _clamp_mascot_center(
-                center=mascot_center,
-                play_res=play_res,
-                font_size=font_size,
+
+        for mascot_sprite, mascot_position in mascot_layers:
+            mascot_frame = (
+                _select_mascot_frame(
+                    mascot_sprite=mascot_sprite,
+                    progress=action_progress,
+                    word_index=_mascot_action_index(cue=cue, active_index=active_index),
+                )
+                if mascot_sprite is not None
+                else None
             )
-            _draw_retro_plumber(draw=draw, center=mascot_center, scale=max(0.7, font_size / 72))
-        else:
-            mascot_center = _clamp_mascot_center(
-                center=mascot_center,
-                play_res=play_res,
+            previous_center = _mascot_anchor(
+                word_boxes[previous_index][1],
                 font_size=font_size,
+                offset_y=mascot_anchor_offset_y,
+                position=mascot_position,
+            )
+            target_center = _mascot_anchor(
+                word_boxes[active_index][1],
+                font_size=font_size,
+                offset_y=mascot_anchor_offset_y,
+                position=mascot_position,
+            )
+            previous_center = _separate_mascot_from_word(
+                center=previous_center,
+                word_box=word_boxes[previous_index][1],
+                font_size=font_size,
+                position=mascot_position,
                 mascot_sprite=mascot_sprite,
-                mascot_image=mascot_frame,
-            )
-            _draw_image_mascot(
-                frame=frame,
                 mascot_frame=mascot_frame,
-                center=mascot_center,
-                font_size=font_size,
-                mascot_sprite=mascot_sprite,
             )
+            target_center = _separate_mascot_from_word(
+                center=target_center,
+                word_box=word_boxes[active_index][1],
+                font_size=font_size,
+                position=mascot_position,
+                mascot_sprite=mascot_sprite,
+                mascot_frame=mascot_frame,
+            )
+            mascot_center = _jump_position(
+                previous_center=previous_center,
+                target_center=target_center,
+                progress=jump_progress,
+                jump_height=_mascot_jump_height(font_size),
+            )
+            if mascot_sprite is None:
+                mascot_center = _clamp_mascot_center(
+                    center=mascot_center,
+                    play_res=play_res,
+                    font_size=font_size,
+                )
+                _draw_retro_plumber(draw=draw, center=mascot_center, scale=max(0.7, font_size / 72))
+            else:
+                mascot_center = _clamp_mascot_center(
+                    center=mascot_center,
+                    play_res=play_res,
+                    font_size=font_size,
+                    mascot_sprite=mascot_sprite,
+                    mascot_image=mascot_frame,
+                )
+                _draw_image_mascot(
+                    frame=frame,
+                    mascot_frame=mascot_frame,
+                    center=mascot_center,
+                    font_size=font_size,
+                    mascot_sprite=mascot_sprite,
+                )
 
 
 def _select_mascot_frame(*, mascot_sprite: MascotSprite, progress: float, word_index: int = 0) -> Image.Image:

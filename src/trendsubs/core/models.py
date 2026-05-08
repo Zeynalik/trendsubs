@@ -39,3 +39,5 @@ class RenderOptions:
     mascot_enabled: bool = True
     character_name: str = "farik"
     mascot_position: str = "center"
+    character_2_name: str = "none"
+    character_2_position: str = "below"

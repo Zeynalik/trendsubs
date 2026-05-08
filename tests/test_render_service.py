@@ -192,6 +192,52 @@ def test_render_subtitled_video_word_pill_uses_jump_overlay_renderer(tmp_path: P
     assert "overlay=0:0:format=auto" in captured[-1][captured[-1].index("-filter_complex") + 1]
 
 
+def test_render_subtitled_video_word_pill_passes_two_character_layers(tmp_path: Path, monkeypatch):
+    srt_path = tmp_path / "input.srt"
+    video_path = tmp_path / "input.mp4"
+    font_path = tmp_path / "font.ttf"
+    output_path = tmp_path / "output.mp4"
+
+    srt_path.write_text("1\n00:00:01,000 --> 00:00:02,500\nHello brave world\n", encoding="utf-8")
+    video_path.write_bytes(b"video")
+    font_path.write_bytes(b"font")
+    called = {}
+
+    def fake_overlay_renderer(**kwargs) -> Path:
+        called.update(kwargs)
+        overlay_path = kwargs["output_path"]
+        overlay_path.write_bytes(b"overlay")
+        return overlay_path
+
+    monkeypatch.setattr("trendsubs.core.render_service.render_word_jump_overlay", fake_overlay_renderer)
+
+    render_subtitled_video(
+        video_path=video_path,
+        srt_path=srt_path,
+        output_path=output_path,
+        options=RenderOptions(
+            preset="social-pop",
+            font_path=str(font_path),
+            accent_color="#FFD84D",
+            font_size=64,
+            bottom_margin=120,
+            keep_ass=False,
+            mode="word-pill",
+            mascot_enabled=True,
+            character_name="alt_girl",
+            mascot_position="left",
+            character_2_name="man",
+            character_2_position="below",
+        ),
+        command_runner=lambda command: None,
+    )
+
+    assert called["mascot_layers"] == [
+        (_default_mascot_path("alt_girl"), "left"),
+        (_default_mascot_path("man"), "below"),
+    ]
+
+
 def test_render_subtitled_video_word_pill_applies_auto_font_scale(tmp_path: Path, monkeypatch):
     srt_path = tmp_path / "input.srt"
     video_path = tmp_path / "input.mp4"
@@ -561,6 +607,14 @@ def test_default_mascot_path_can_select_alt_girl_asset():
 
     assert mascot_path is not None
     assert mascot_path.name == "alt_girl_character.png"
+    assert mascot_path.exists()
+
+
+def test_default_mascot_path_can_select_man_asset():
+    mascot_path = _default_mascot_path("man")
+
+    assert mascot_path is not None
+    assert mascot_path.name == "man_character.png"
     assert mascot_path.exists()
 
 

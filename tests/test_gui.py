@@ -38,7 +38,7 @@ def test_build_color_names_exposes_available_colors():
 
 
 def test_build_character_names_exposes_available_characters():
-    assert build_character_names() == ["Farik", "Alt Girl"]
+    assert build_character_names() == ["Farik", "Alt Girl", "Man"]
 
 
 def test_discover_font_paths_includes_bundled_caption_fonts():
@@ -90,9 +90,13 @@ def test_trendsubs_window_builds_expected_form_fields():
     assert window.auto_scale_check.isChecked() is True
     assert window.character_combo.currentText() == "Farik"
     assert window.character_combo.findText("Alt Girl") >= 0
+    assert window.character_combo.findText("Man") >= 0
+    assert window.character_2_combo.currentText() == "None"
+    assert window.character_2_combo.findText("Man") >= 0
     assert window.mascot_check.text() == "Enabled"
     assert window.mascot_check.isChecked() is True
     assert window.mascot_position_combo.currentText() == "Center"
+    assert window.character_2_position_combo.currentText() == "Below"
     assert window.render_button.text() == "Render"
     assert window.preview_button.text() == "Preview Frame"
     assert window.size_input.text() == "40"
@@ -180,6 +184,8 @@ def test_trendsubs_window_persists_settings_except_video_and_srt(tmp_path, monke
     first_window.character_combo.setCurrentText("Alt Girl")
     first_window.mascot_check.setChecked(False)
     first_window.mascot_position_combo.setCurrentText("Below")
+    first_window.character_2_combo.setCurrentText("Man")
+    first_window.character_2_position_combo.setCurrentText("Left")
     first_window.close()
 
     second_window = TrendSubsWindow()
@@ -202,6 +208,8 @@ def test_trendsubs_window_persists_settings_except_video_and_srt(tmp_path, monke
     assert second_window.character_combo.currentText() == "Alt Girl"
     assert second_window.mascot_check.isChecked() is False
     assert second_window.mascot_position_combo.currentText() == "Below"
+    assert second_window.character_2_combo.currentText() == "Man"
+    assert second_window.character_2_position_combo.currentText() == "Left"
     second_window.close()
     app.quit()
 
@@ -247,6 +255,8 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     window.character_combo.setCurrentText("Alt Girl")
     window.mascot_check.setChecked(False)
     window.mascot_position_combo.setCurrentText("Right")
+    window.character_2_combo.setCurrentText("Man")
+    window.character_2_position_combo.setCurrentText("Below")
     window.run_render()
 
     assert called["video_path"] == video_path
@@ -262,6 +272,8 @@ def test_trendsubs_window_run_render_uses_shared_service(tmp_path, monkeypatch):
     assert called["options"].character_name == "alt_girl"
     assert called["options"].mascot_enabled is False
     assert called["options"].mascot_position == "right"
+    assert called["options"].character_2_name == "man"
+    assert called["options"].character_2_position == "below"
     assert f"Font: {font_path.resolve()}" in window.log_output.toPlainText()
     assert "Rendered video" in window.log_output.toPlainText()
     app.quit()

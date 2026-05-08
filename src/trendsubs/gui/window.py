@@ -37,6 +37,12 @@ COLOR_OPTIONS: dict[str, str] = {
 CHARACTER_OPTIONS: dict[str, str] = {
     "Farik": "farik",
     "Alt Girl": "alt_girl",
+    "Man": "man",
+}
+
+OPTIONAL_CHARACTER_OPTIONS: dict[str, str] = {
+    "None": "none",
+    **CHARACTER_OPTIONS,
 }
 
 MASCOT_POSITION_OPTIONS: dict[str, str] = {
@@ -160,6 +166,13 @@ class TrendSubsWindow(QWidget):
         self.mascot_position_combo = QComboBox()
         for label, value in MASCOT_POSITION_OPTIONS.items():
             self.mascot_position_combo.addItem(label, value)
+        self.character_2_combo = QComboBox()
+        for label, value in OPTIONAL_CHARACTER_OPTIONS.items():
+            self.character_2_combo.addItem(label, value)
+        self.character_2_position_combo = QComboBox()
+        for label, value in MASCOT_POSITION_OPTIONS.items():
+            self.character_2_position_combo.addItem(label, value)
+        self.character_2_position_combo.setCurrentText("Below")
 
         self.preset_combo = QComboBox()
         self.preset_combo.addItems(build_preset_names())
@@ -193,8 +206,10 @@ class TrendSubsWindow(QWidget):
         form.addRow("Max Words/Caption (0=off)", self.max_caption_words_input)
         form.addRow("Preview Time (sec)", self.preview_time_input)
         form.addRow("Auto Scale", self.auto_scale_check)
-        form.addRow("Character", _build_character_row(self.character_combo, self.mascot_check))
-        form.addRow("Character Position", self.mascot_position_combo)
+        form.addRow("Character 1", _build_character_row(self.character_combo, self.mascot_check))
+        form.addRow("Character 1 Position", self.mascot_position_combo)
+        form.addRow("Character 2", self.character_2_combo)
+        form.addRow("Character 2 Position", self.character_2_position_combo)
 
         layout = QVBoxLayout()
         layout.addLayout(form)
@@ -391,6 +406,8 @@ class TrendSubsWindow(QWidget):
             mascot_enabled=self.mascot_check.isChecked(),
             character_name=str(self.character_combo.currentData() or "farik"),
             mascot_position=str(self.mascot_position_combo.currentData() or "center"),
+            character_2_name=str(self.character_2_combo.currentData() or "none"),
+            character_2_position=str(self.character_2_position_combo.currentData() or "below"),
         )
 
     def _selected_font_text(self) -> str:
@@ -434,6 +451,8 @@ class TrendSubsWindow(QWidget):
             "character": self.character_combo.currentText(),
             "mascot_enabled": self.mascot_check.isChecked(),
             "mascot_position": self.mascot_position_combo.currentText(),
+            "character_2": self.character_2_combo.currentText(),
+            "character_2_position": self.character_2_position_combo.currentText(),
         }
         settings_file = _settings_file_path()
         settings_file.parent.mkdir(parents=True, exist_ok=True)
@@ -497,6 +516,18 @@ class TrendSubsWindow(QWidget):
             mascot_position_index = self.mascot_position_combo.findData(saved_mascot_position)
         if mascot_position_index >= 0:
             self.mascot_position_combo.setCurrentIndex(mascot_position_index)
+        saved_character_2 = str(state.get("character_2", "") or state.get("character_2_name", "") or "")
+        character_2_index = self.character_2_combo.findText(saved_character_2)
+        if character_2_index < 0:
+            character_2_index = self.character_2_combo.findData(saved_character_2)
+        if character_2_index >= 0:
+            self.character_2_combo.setCurrentIndex(character_2_index)
+        saved_character_2_position = str(state.get("character_2_position", "") or "")
+        character_2_position_index = self.character_2_position_combo.findText(saved_character_2_position)
+        if character_2_position_index < 0:
+            character_2_position_index = self.character_2_position_combo.findData(saved_character_2_position)
+        if character_2_position_index >= 0:
+            self.character_2_position_combo.setCurrentIndex(character_2_position_index)
 
     def _sync_output_path_from_video(self) -> None:
         video_raw = _normalize_path_input(self.video_input.text())

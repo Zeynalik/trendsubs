@@ -75,6 +75,7 @@ def render_subtitled_video(
                 mascot_enabled=options.mascot_enabled,
                 mascot_image_path=_default_mascot_path(options.character_name),
                 mascot_position=options.mascot_position,
+                mascot_layers=_character_layers(options),
                 command_runner=runner,
             )
             command = build_overlay_command(
@@ -130,6 +131,7 @@ def render_subtitled_video(
                 draw_subtitles=False,
                 mascot_anchor_offset_y=_non_word_pill_mascot_anchor_offset(effective_font_size),
                 mascot_position=options.mascot_position,
+                mascot_layers=_character_layers(options),
                 command_runner=runner,
             )
             runner(
@@ -203,6 +205,7 @@ def _default_mascot_path(character_name: str = "farik") -> Path | None:
     asset_names = {
         "farik": "farik_character.png",
         "alt_girl": "alt_girl_character.png",
+        "man": "man_character.png",
     }
     mascot_path = (
         Path(__file__).resolve().parents[3]
@@ -263,6 +266,7 @@ def render_preview_frame(
                 mascot_enabled=options.mascot_enabled,
                 mascot_image_path=_default_mascot_path(options.character_name),
                 mascot_position=options.mascot_position,
+                mascot_layers=_character_layers(options),
             )
             command = build_overlay_preview_command(
                 video_path=video_path,
@@ -321,6 +325,7 @@ def render_preview_frame(
                 draw_subtitles=False,
                 mascot_anchor_offset_y=_non_word_pill_mascot_anchor_offset(effective_font_size),
                 mascot_position=options.mascot_position,
+                mascot_layers=_character_layers(options),
             )
             _compose_preview_layers(
                 base_path=preview_base_path,
@@ -352,6 +357,20 @@ def _compose_preview_layers(*, base_path: Path, overlay_path: Path, output_path:
         overlay_image = overlay_source.convert("RGBA")
     base_image.alpha_composite(overlay_image)
     base_image.save(output_path)
+
+
+def _character_layers(options: RenderOptions) -> list[tuple[Path, str]]:
+    layers: list[tuple[Path, str]] = []
+    if options.mascot_enabled:
+        primary_path = _default_mascot_path(options.character_name)
+        if primary_path is not None:
+            layers.append((primary_path, options.mascot_position))
+
+    second_path = _default_mascot_path(options.character_2_name)
+    if second_path is not None:
+        layers.append((second_path, options.character_2_position))
+
+    return layers
 
 
 def _non_word_pill_mascot_anchor_offset(font_size: int) -> int:
