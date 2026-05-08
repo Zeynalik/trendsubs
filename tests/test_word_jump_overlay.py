@@ -363,6 +363,27 @@ def test_man_sprite_keeps_hands_after_background_cleanup():
         assert skin_pixels > 180
 
 
+def test_man_gamepad_timer_frames_keep_feet_and_mug_visible():
+    frames_dir = Path("assets/mascot/man_character_frames")
+    for frame_name in ("12.png", "14.png", "15.png", "17.png"):
+        frame = Image.open(frames_dir / frame_name).convert("RGBA")
+        shoe_pixels = 0
+        beer_pixels = 0
+        for y in range(int(frame.height * 0.68), frame.height):
+            for x in range(0, int(frame.width * 0.70)):
+                red, green, blue, alpha = frame.getpixel((x, y))
+                if alpha > 80 and red > 150 and green > 140 and blue > 120:
+                    shoe_pixels += 1
+        for y in range(frame.height):
+            for x in range(int(frame.width * 0.58), frame.width):
+                red, green, blue, alpha = frame.getpixel((x, y))
+                if alpha > 80 and red > 180 and 100 < green < 235 and blue < 110:
+                    beer_pixels += 1
+
+        assert shoe_pixels > 300
+        assert beer_pixels > 180
+
+
 def test_man_sprite_has_no_yellow_sheet_background_between_legs():
     frames_dir = Path("assets/mascot/man_character_frames")
     for frame_name in ("09.png", "18.png", "19.png", "20.png", "21.png", "22.png", "23.png"):
