@@ -342,6 +342,26 @@ def test_man_sprite_keeps_yellow_beer_in_timer_mugs():
         assert yellow_beer_pixels > minimum_pixels
 
 
+def test_man_sprite_keeps_hands_after_background_cleanup():
+    frames_dir = Path("assets/mascot/man_character_frames")
+    hand_regions = {
+        "00.png": (80, 110, 130, 155),
+        "08.png": (75, 108, 125, 150),
+        "11.png": (80, 108, 125, 150),
+    }
+
+    for frame_name, (left, top, right, bottom) in hand_regions.items():
+        frame = Image.open(frames_dir / frame_name).convert("RGBA")
+        skin_pixels = 0
+        for y in range(top, bottom):
+            for x in range(left, right):
+                red, green, blue, alpha = frame.getpixel((x, y))
+                if alpha > 80 and red > 150 and 80 < green < 190 and blue < 140 and red > blue + 40:
+                    skin_pixels += 1
+
+        assert skin_pixels > 180
+
+
 def test_man_sprite_has_no_yellow_sheet_background_between_legs():
     frames_dir = Path("assets/mascot/man_character_frames")
     for frame_name in ("18.png", "19.png", "20.png", "21.png", "22.png", "23.png"):
