@@ -239,7 +239,7 @@ def test_mascot_anchor_can_move_to_word_start_end_or_below():
 
     assert _mascot_anchor(box, font_size=50, position="left") == (68, 116)
     assert _mascot_anchor(box, font_size=50, position="right") == (192, 116)
-    assert _mascot_anchor(box, font_size=50, position="below") == (130, 228)
+    assert _mascot_anchor(box, font_size=50, position="below") == (130, 172)
 
 
 def test_mascot_frame_selection_uses_one_six_frame_cycle_per_word():
@@ -289,6 +289,11 @@ def test_man_sprite_includes_beer_timer_cycles():
     assert sprite is not None
     assert len(sprite.frames) == 24
     assert len(sprite.frames) % 6 == 0
+    for frame in sprite.frames:
+        bbox = frame.getchannel("A").getbbox()
+        assert bbox is not None
+        assert bbox[1] >= 8
+        assert bbox[3] <= frame.height - 8
 
 
 def test_street_fighter_combo_key_frames_have_readable_special_actions():
@@ -448,8 +453,9 @@ def test_mascot_side_positions_keep_current_frame_clear_of_word():
         font_size=64,
         reference_visible_height=sprite.reference_visible_height,
     )
-    gap = max(10, round(64 * 0.25))
+    side_gap = max(10, round(64 * 0.25))
+    below_gap = max(4, round(64 * 0.06))
 
-    assert left_center[0] + right_extent <= word_box[0] - gap
-    assert right_center[0] - left_extent >= word_box[2] + gap
-    assert below_center[1] - top_extent >= word_box[3] + gap
+    assert left_center[0] + right_extent <= word_box[0] - side_gap
+    assert right_center[0] - left_extent >= word_box[2] + side_gap
+    assert below_center[1] - top_extent >= word_box[3] + below_gap

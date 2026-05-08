@@ -752,7 +752,7 @@ def _mascot_anchor(
         y = pill_top + 3
     elif normalized_position == "below":
         x = round((box[0] + box[2]) / 2)
-        y = box[3] + max(34, round(font_size * 1.36))
+        y = box[3] + max(12, round(font_size * 0.24))
     else:
         x = round((box[0] + box[2]) / 2)
         y = pill_top + 3
@@ -787,13 +787,14 @@ def _separate_mascot_from_word(
         )
 
     gap = max(10, round(font_size * 0.25))
+    below_gap = max(4, round(font_size * 0.06))
     x, y = center
     if normalized_position == "left":
         x = min(x, word_box[0] - gap - right_extent)
     elif normalized_position == "right":
         x = max(x, word_box[2] + gap + left_extent)
     elif normalized_position == "below":
-        y = max(y, word_box[3] + gap + top_extent)
+        y = max(y, word_box[3] + below_gap + top_extent)
     return round(x), round(y)
 
 
