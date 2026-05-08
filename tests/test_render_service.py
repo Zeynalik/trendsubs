@@ -619,6 +619,14 @@ def test_default_mascot_path_can_select_man_asset():
     assert mascot_path.exists()
 
 
+def test_default_mascot_path_can_select_lizard_asset():
+    mascot_path = _default_mascot_path("lizard")
+
+    assert mascot_path is not None
+    assert mascot_path.name == "lizard_character.png"
+    assert mascot_path.exists()
+
+
 def test_default_mascot_path_does_not_fallback_for_disabled_character():
     assert _default_mascot_path("none") is None
     assert _default_mascot_path("") is None

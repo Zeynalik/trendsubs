@@ -206,6 +206,7 @@ def _default_mascot_path(character_name: str = "farik") -> Path | None:
         "farik": "farik_character.png",
         "alt_girl": "alt_girl_character.png",
         "man": "man_character.png",
+        "lizard": "lizard_character.png",
     }
     asset_name = asset_names.get(str(character_name or "").strip().lower())
     if asset_name is None:

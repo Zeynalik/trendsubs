@@ -296,6 +296,56 @@ def test_man_sprite_includes_beer_timer_cycles():
         assert bbox[3] <= frame.height - 8
 
 
+def test_lizard_sprite_includes_beer_tongue_and_idle_cycles():
+    mascot_path = Path("assets/mascot/lizard_character.png")
+    sprite = _load_mascot_sprite(mascot_path)
+
+    assert sprite is not None
+    assert len(sprite.frames) == 24
+    assert len(sprite.frames) % 6 == 0
+    for frame in sprite.frames:
+        bbox = frame.getchannel("A").getbbox()
+        assert bbox is not None
+        assert bbox[0] >= 8
+        assert bbox[1] >= 8
+        assert bbox[2] <= frame.width - 8
+        assert bbox[3] <= frame.height - 8
+
+
+def test_lizard_sprite_keeps_beer_tongue_and_fly_details():
+    frames_dir = Path("assets/mascot/lizard_character_frames")
+    beer_frame = Image.open(frames_dir / "00.png").convert("RGBA")
+    tongue_frame = Image.open(frames_dir / "06.png").convert("RGBA")
+
+    beer_pixels = list(beer_frame.get_flattened_data())
+    tongue_pixels = list(tongue_frame.get_flattened_data())
+    green_lizard_pixels = [
+        pixel
+        for pixel in beer_pixels
+        if pixel[3] > 80 and pixel[1] > 120 and pixel[0] < 170 and pixel[2] < 120
+    ]
+    beer_yellow_pixels = [
+        pixel
+        for pixel in beer_pixels
+        if pixel[3] > 80 and pixel[0] > 180 and 100 < pixel[1] < 235 and pixel[2] < 130
+    ]
+    tongue_red_pixels = [
+        pixel
+        for pixel in tongue_pixels
+        if pixel[3] > 80 and pixel[0] > 150 and 30 < pixel[1] < 130 and 40 < pixel[2] < 130
+    ]
+    fly_dark_pixels = [
+        pixel
+        for pixel in tongue_pixels
+        if pixel[3] > 80 and pixel[0] < 100 and pixel[1] < 110 and pixel[2] < 100
+    ]
+
+    assert len(green_lizard_pixels) > 2500
+    assert len(beer_yellow_pixels) > 300
+    assert len(tongue_red_pixels) > 900
+    assert len(fly_dark_pixels) > 30
+
+
 def test_man_sprite_keeps_beer_and_fart_effect_colors():
     frames_dir = Path("assets/mascot/man_character_frames")
     beer_frame = Image.open(frames_dir / "16.png").convert("RGBA")

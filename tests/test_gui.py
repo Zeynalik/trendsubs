@@ -38,7 +38,7 @@ def test_build_color_names_exposes_available_colors():
 
 
 def test_build_character_names_exposes_available_characters():
-    assert build_character_names() == ["Farik", "Alt Girl", "Man"]
+    assert build_character_names() == ["Farik", "Alt Girl", "Man", "Lizard"]
 
 
 def test_discover_font_paths_includes_bundled_caption_fonts():
@@ -91,8 +91,10 @@ def test_trendsubs_window_builds_expected_form_fields():
     assert window.character_combo.currentText() == "Farik"
     assert window.character_combo.findText("Alt Girl") >= 0
     assert window.character_combo.findText("Man") >= 0
+    assert window.character_combo.findText("Lizard") >= 0
     assert window.character_2_combo.currentText() == "None"
     assert window.character_2_combo.findText("Man") >= 0
+    assert window.character_2_combo.findText("Lizard") >= 0
     assert window.mascot_check.text() == "Enabled"
     assert window.mascot_check.isChecked() is True
     assert window.mascot_position_combo.currentText() == "Center"

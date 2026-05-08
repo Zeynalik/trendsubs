@@ -38,6 +38,7 @@ CHARACTER_OPTIONS: dict[str, str] = {
     "Farik": "farik",
     "Alt Girl": "alt_girl",
     "Man": "man",
+    "Lizard": "lizard",
 }
 
 OPTIONAL_CHARACTER_OPTIONS: dict[str, str] = {
