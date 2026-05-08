@@ -318,6 +318,30 @@ def test_man_sprite_keeps_beer_and_fart_effect_colors():
     assert len(fart_green_pixels) > 1200
 
 
+def test_man_sprite_keeps_yellow_beer_in_timer_mugs():
+    frames_dir = Path("assets/mascot/man_character_frames")
+    minimum_right_side_beer_pixels = {
+        "00.png": 180,
+        "05.png": 150,
+        "08.png": 500,
+        "10.png": 450,
+        "16.png": 200,
+        "21.png": 150,
+        "23.png": 80,
+    }
+
+    for frame_name, minimum_pixels in minimum_right_side_beer_pixels.items():
+        frame = Image.open(frames_dir / frame_name).convert("RGBA")
+        yellow_beer_pixels = 0
+        for y in range(frame.height):
+            for x in range(int(frame.width * 0.58), frame.width):
+                red, green, blue, alpha = frame.getpixel((x, y))
+                if alpha > 80 and red > 180 and 100 < green < 235 and blue < 110:
+                    yellow_beer_pixels += 1
+
+        assert yellow_beer_pixels > minimum_pixels
+
+
 def test_man_sprite_has_no_yellow_sheet_background_between_legs():
     frames_dir = Path("assets/mascot/man_character_frames")
     for frame_name in ("18.png", "19.png", "20.png", "21.png", "22.png", "23.png"):
@@ -325,7 +349,7 @@ def test_man_sprite_has_no_yellow_sheet_background_between_legs():
         width, height = frame.size
         suspicious_yellow_pixels = 0
         for y in range(int(height * 0.72), height):
-            for x in range(int(width * 0.18), int(width * 0.73)):
+            for x in range(int(width * 0.18), int(width * 0.56)):
                 red, green, blue, alpha = frame.getpixel((x, y))
                 if alpha > 40 and red > 165 and green > 90 and blue < 150 and red - blue > 60:
                     suspicious_yellow_pixels += 1
