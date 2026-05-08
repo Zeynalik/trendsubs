@@ -315,7 +315,22 @@ def test_man_sprite_keeps_beer_and_fart_effect_colors():
     ]
 
     assert len(beer_yellow_pixels) > 800
-    assert len(fart_green_pixels) > 600
+    assert len(fart_green_pixels) > 1200
+
+
+def test_man_sprite_has_no_yellow_sheet_background_between_legs():
+    frames_dir = Path("assets/mascot/man_character_frames")
+    for frame_name in ("18.png", "19.png", "20.png", "21.png", "22.png", "23.png"):
+        frame = Image.open(frames_dir / frame_name).convert("RGBA")
+        width, height = frame.size
+        suspicious_yellow_pixels = 0
+        for y in range(int(height * 0.72), height):
+            for x in range(int(width * 0.18), int(width * 0.73)):
+                red, green, blue, alpha = frame.getpixel((x, y))
+                if alpha > 40 and red > 165 and green > 90 and blue < 150 and red - blue > 60:
+                    suspicious_yellow_pixels += 1
+
+        assert suspicious_yellow_pixels < 40
 
 
 def test_street_fighter_combo_key_frames_have_readable_special_actions():
