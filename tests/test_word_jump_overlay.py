@@ -296,6 +296,28 @@ def test_man_sprite_includes_beer_timer_cycles():
         assert bbox[3] <= frame.height - 8
 
 
+def test_man_sprite_keeps_beer_and_fart_effect_colors():
+    frames_dir = Path("assets/mascot/man_character_frames")
+    beer_frame = Image.open(frames_dir / "16.png").convert("RGBA")
+    fart_frame = Image.open(frames_dir / "09.png").convert("RGBA")
+
+    beer_pixels = list(beer_frame.get_flattened_data())
+    fart_pixels = list(fart_frame.get_flattened_data())
+    beer_yellow_pixels = [
+        pixel
+        for pixel in beer_pixels
+        if pixel[3] > 80 and pixel[0] > 180 and 100 < pixel[1] < 230 and pixel[2] < 100
+    ]
+    fart_green_pixels = [
+        pixel
+        for pixel in fart_pixels
+        if pixel[3] > 80 and 80 < pixel[0] < 190 and pixel[1] > 110 and pixel[2] < 100
+    ]
+
+    assert len(beer_yellow_pixels) > 800
+    assert len(fart_green_pixels) > 600
+
+
 def test_street_fighter_combo_key_frames_have_readable_special_actions():
     frames_dir = Path("assets/mascot/farik_character_frames")
     uppercut = Image.open(frames_dir / "46.png").convert("RGBA")

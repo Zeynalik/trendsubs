@@ -6,6 +6,7 @@ from trendsubs.core.models import RenderOptions, SubtitleCue, WordSlice
 from trendsubs.core.render_service import (
     _apply_caption_word_limit,
     _build_mascot_overlay_cues,
+    _character_layers,
     _default_mascot_path,
     _non_word_pill_mascot_anchor_offset,
     render_preview_frame,
@@ -616,6 +617,28 @@ def test_default_mascot_path_can_select_man_asset():
     assert mascot_path is not None
     assert mascot_path.name == "man_character.png"
     assert mascot_path.exists()
+
+
+def test_default_mascot_path_does_not_fallback_for_disabled_character():
+    assert _default_mascot_path("none") is None
+    assert _default_mascot_path("") is None
+    assert _default_mascot_path("missing") is None
+
+
+def test_character_layers_omits_disabled_second_character():
+    options = RenderOptions(
+        preset="social-pop",
+        font_path="font.ttf",
+        accent_color="#FFD84D",
+        font_size=64,
+        bottom_margin=120,
+        keep_ass=False,
+        mascot_enabled=False,
+        character_name="alt_girl",
+        character_2_name="none",
+    )
+
+    assert _character_layers(options) == []
 
 
 def test_word_mode_mascot_overlay_cues_follow_single_displayed_words():

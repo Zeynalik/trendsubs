@@ -207,11 +207,14 @@ def _default_mascot_path(character_name: str = "farik") -> Path | None:
         "alt_girl": "alt_girl_character.png",
         "man": "man_character.png",
     }
+    asset_name = asset_names.get(str(character_name or "").strip().lower())
+    if asset_name is None:
+        return None
     mascot_path = (
         Path(__file__).resolve().parents[3]
         / "assets"
         / "mascot"
-        / asset_names.get(character_name, "farik_character.png")
+        / asset_name
     )
     if mascot_path.exists():
         return mascot_path
