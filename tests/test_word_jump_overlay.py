@@ -315,7 +315,7 @@ def test_man_sprite_keeps_beer_and_fart_effect_colors():
     ]
 
     assert len(beer_yellow_pixels) > 800
-    assert len(fart_green_pixels) > 1200
+    assert len(fart_green_pixels) > 2600
 
 
 def test_man_sprite_keeps_yellow_beer_in_timer_mugs():
@@ -326,8 +326,9 @@ def test_man_sprite_keeps_yellow_beer_in_timer_mugs():
         "08.png": 500,
         "10.png": 450,
         "16.png": 200,
+        "20.png": 400,
         "21.png": 150,
-        "23.png": 80,
+        "23.png": 250,
     }
 
     for frame_name, minimum_pixels in minimum_right_side_beer_pixels.items():
@@ -364,7 +365,7 @@ def test_man_sprite_keeps_hands_after_background_cleanup():
 
 def test_man_sprite_has_no_yellow_sheet_background_between_legs():
     frames_dir = Path("assets/mascot/man_character_frames")
-    for frame_name in ("18.png", "19.png", "20.png", "21.png", "22.png", "23.png"):
+    for frame_name in ("09.png", "18.png", "19.png", "20.png", "21.png", "22.png", "23.png"):
         frame = Image.open(frames_dir / frame_name).convert("RGBA")
         width, height = frame.size
         suspicious_yellow_pixels = 0
