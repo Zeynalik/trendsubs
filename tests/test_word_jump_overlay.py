@@ -7,6 +7,7 @@ from trendsubs.core.word_jump_overlay import (
     MascotSprite,
     _active_cue,
     _active_word_index,
+    _build_rawvideo_overlay_command,
     _clamp_mascot_center,
     _draw_active_word,
     _draw_image_mascot,
@@ -138,6 +139,19 @@ def test_load_font_rejects_invalid_font_file(tmp_path):
         assert str(font_path) in str(error)
     else:
         raise AssertionError("invalid font file was silently accepted")
+
+
+def test_rawvideo_overlay_command_streams_frames_without_png_sequence(tmp_path):
+    output_path = tmp_path / "overlay.mov"
+
+    command = _build_rawvideo_overlay_command(output_path=output_path, play_res=(1920, 1080), fps=30)
+
+    assert "-f" in command
+    assert command[command.index("-f") + 1] == "rawvideo"
+    assert command[command.index("-pix_fmt") + 1] == "rgba"
+    assert command[command.index("-i") + 1] == "pipe:0"
+    assert "%06d.png" not in command
+    assert command[-1] == str(output_path)
 
 
 def test_active_word_draws_red_reference_pill_without_white_inner_border():

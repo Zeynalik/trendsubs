@@ -5,7 +5,6 @@ from pathlib import Path
 import math
 import shutil
 import subprocess
-import tempfile
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -64,8 +63,15 @@ def render_word_jump_overlay(
         mascot_layers=mascot_layers,
     )
 
-    with tempfile.TemporaryDirectory(prefix="trendsubs_word_jump_") as temp_dir:
-        frames_dir = Path(temp_dir)
+    command = _build_rawvideo_overlay_command(output_path=output_path, play_res=(width, height), fps=fps)
+    if command_runner is not None:
+        command_runner(command)
+        return output_path
+
+    process = subprocess.Popen(command, stdin=subprocess.PIPE)
+    try:
+        if process.stdin is None:
+            raise RuntimeError("ffmpeg stdin pipe is not available.")
         for frame_index in range(frame_count):
             at_ms = round(frame_index * 1000 / fps)
             frame = _build_word_jump_frame(
@@ -88,25 +94,43 @@ def render_word_jump_overlay(
                 mascot_anchor_offset_y=mascot_anchor_offset_y,
                 mascot_position=mascot_position,
             )
-            frame.save(frames_dir / f"{frame_index:06d}.png")
+            process.stdin.write(frame.tobytes("raw", "RGBA"))
+        process.stdin.close()
+        return_code = process.wait()
+    except Exception:
+        if process.stdin is not None and not process.stdin.closed:
+            process.stdin.close()
+        process.kill()
+        process.wait()
+        raise
 
-        command = [
-            _resolve_ffmpeg_executable(),
-            "-y",
-            "-framerate",
-            str(fps),
-            "-i",
-            str(frames_dir / "%06d.png"),
-            "-c:v",
-            "qtrle",
-            "-pix_fmt",
-            "argb",
-            str(output_path),
-        ]
-        runner = command_runner or _run_command
-        runner(command)
+    if return_code != 0:
+        raise subprocess.CalledProcessError(return_code, command)
 
     return output_path
+
+
+def _build_rawvideo_overlay_command(*, output_path: Path, play_res: tuple[int, int], fps: int) -> list[str]:
+    return [
+        _resolve_ffmpeg_executable(),
+        "-y",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgba",
+        "-s",
+        f"{play_res[0]}x{play_res[1]}",
+        "-framerate",
+        str(fps),
+        "-i",
+        "pipe:0",
+        "-an",
+        "-c:v",
+        "qtrle",
+        "-pix_fmt",
+        "argb",
+        str(output_path),
+    ]
 
 
 def render_word_jump_frame(

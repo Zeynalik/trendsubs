@@ -76,7 +76,7 @@ def render_subtitled_video(
                 mascot_image_path=_default_mascot_path(options.character_name),
                 mascot_position=options.mascot_position,
                 mascot_layers=_character_layers(options),
-                command_runner=runner,
+                command_runner=command_runner,
             )
             command = build_overlay_command(
                 video_path=video_path,
@@ -132,7 +132,7 @@ def render_subtitled_video(
                 mascot_anchor_offset_y=_non_word_pill_mascot_anchor_offset(effective_font_size),
                 mascot_position=options.mascot_position,
                 mascot_layers=_character_layers(options),
-                command_runner=runner,
+                command_runner=command_runner,
             )
             runner(
                 build_overlay_command(

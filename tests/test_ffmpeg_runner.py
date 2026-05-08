@@ -24,6 +24,7 @@ def test_build_ffmpeg_command_targets_ass_filter_and_h264_output():
     assert command[command.index("-movflags") + 1] == "+faststart"
     assert command[command.index("-profile:v") + 1] == "high"
     assert command[command.index("-level") + 1] == "4.1"
+    assert command[command.index("-preset") + 1] == "veryfast"
     assert "aac" in command
     assert command[-1] == "output.mp4"
 
@@ -60,6 +61,7 @@ def test_build_overlay_command_composites_transparent_overlay_video():
     assert command[command.index("-movflags") + 1] == "+faststart"
     assert command[command.index("-profile:v") + 1] == "high"
     assert command[command.index("-level") + 1] == "4.1"
+    assert command[command.index("-preset") + 1] == "veryfast"
     assert command[-1] == "output.mp4"
 
 
